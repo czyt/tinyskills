@@ -28,6 +28,33 @@ Many skills in this repo are open source (Apache 2.0). We've also included the d
 
 # Try in Claude Code, Claude.ai, and the API
 
+## Local Installation (Development)
+
+If you've cloned this repository and want to use the skills locally, you can create symbolic links to `~/.claude/skills/` for easier development:
+
+### Linux / macOS
+```bash
+# Install all skills from this repository
+./install.sh
+
+# Uninstall all skills from this repository
+./uninstall.sh
+```
+
+### Windows (PowerShell)
+```powershell
+# Install all skills from this repository
+# Note: Requires Administrator privileges or Developer Mode enabled
+.\install.ps1
+
+# Uninstall all skills from this repository
+.\uninstall.ps1
+```
+
+**Windows Note:** Creating symbolic links on Windows requires either:
+- Running PowerShell as Administrator, OR
+- Enabling Developer Mode: Settings → Update & Security → For developers
+
 ## Claude Code
 You can register this repository as a Claude Code Plugin marketplace by running the following command in Claude Code:
 ```
