@@ -74,6 +74,41 @@ icon: ./icon.png  # User-provided 512x512 PNG
 # Supports first-time and update publishing
 ```
 
+## ⚙️ Skill Preferences
+
+This skill supports configurable preferences to customize the generated manifest:
+
+### Add / to public_path (default: enabled)
+
+**Preference ID**: `add_root_to_public_path`
+
+By default, the skill automatically adds `"/"` to the `application.public_path` array in generated manifests. This is useful for applications that:
+- Serve static files
+- Need root path public access
+- Use file handlers for downloads
+
+**With preference enabled (default)**:
+```yaml
+application:
+  subdomain: myapp
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend: http://myapp:8080/
+```
+
+**With preference disabled**:
+```yaml
+application:
+  subdomain: myapp
+  upstreams:
+    - location: /
+      backend: http://myapp:8080/
+```
+
+**How to configure**: Access skill preferences through Claude Code settings.
+
 ## 🚀 Quick Usage Examples
 
 ### Example 1: Convert Docker Compose

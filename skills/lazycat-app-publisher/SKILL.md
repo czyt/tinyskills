@@ -1,6 +1,12 @@
 ---
 name: lazycat-app-publisher
 description: LazyCat v1.4.1+ app publisher with intelligent Docker Compose conversion, smart dependency analysis, auto-generated credentials, compose_override support, advanced routing (upstreams/ingress), file handlers, hardware acceleration, and complete publishing workflow.
+preferences:
+  - id: add_root_to_public_path
+    name: Add / to public_path
+    description: Automatically add "/" to application.public_path in the generated manifest
+    type: boolean
+    default: true
 ---
 
 # LazyCat App Publisher
@@ -706,6 +712,40 @@ services:
 ---
 
 **Summary**: This intelligent skill reduces configuration burden by automatically analyzing service dependencies, generating secure internal configurations, and optimizing the setup wizard for 60% faster deployment with 83% fewer errors.
+
+## Preferences
+
+This skill supports the following preferences:
+
+### Add / to public_path (default: true)
+
+**ID**: `add_root_to_public_path`
+
+When enabled (default), the skill automatically adds `"/"` to the `application.public_path` array in the generated manifest. This is useful for applications that serve static files or need root path access.
+
+**Example Output** (when enabled):
+```yaml
+application:
+  subdomain: myapp
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend: http://myapp:8080/
+```
+
+**Example Output** (when disabled):
+```yaml
+application:
+  subdomain: myapp
+  upstreams:
+    - location: /
+      backend: http://myapp:8080/
+```
+
+**When to disable**: If your application doesn't need public path access or if you want to manually configure public_path later.
+
+**How to configure**: You can configure this preference in your Claude Code settings under skill preferences.
 
 ## How to Use
 
