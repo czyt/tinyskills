@@ -1910,11 +1910,22 @@ The skill will automatically:
 **Manual Image Copy:**
 ```bash
 # Copy image to official LazyCat registry
-lzc-cli appstore copy-image heizicao/yuque-sync:latest
+lzc-cli appstore copy-image ghcr.io/engigu/baihu:latest
 
 # Output:
-# Waiting ... ( copy heizicao/yuque-sync:latest to lazycat offical registry)
-# lazycat-registry: registry.lazycat.cloud/czyt/heizicao/yuque-sync:8491074e73af38d8
+# Waiting ... ( copy ghcr.io/engigu/baihu:latest (amd64) to lazycat offical registry)
+# uploading
+# 2fb89486: [####################################################################################################] 100%
+# 38ea343d: [####################################################################################################] 100%
+# 68c56900: [####################################################################################################] 100%
+# 759cb122: [####################################################################################################] 100%
+# 94e69946: [####################################################################################################] 100%
+# acb0e2be: [####################################################################################################] 100%
+# ae4ce04d: [####################################################################################################] 100%
+# b21455ef: [####################################################################################################] 100%
+# d1ca114d: [####################################################################################################] 100%
+#
+# uploaded:  registry.lazycat.cloud/czyt/engigu/baihu:45666f85198d186d
 ```
 
 **Key Points:**
@@ -1937,8 +1948,15 @@ lzc-cli project build -o app-1.0.1.lpk
 
 **Automation Script Logic:**
 ```bash
-# Extract new image from copy-image output
-new_image=$(echo "$result" | grep "lazycat-registry:" | sed 's/.*lazycat-registry: //')
+# Execute copy-image and capture output
+result=$(lzc-cli appstore copy-image "$original_image" 2>&1)
+
+# Extract new image from the "uploaded:" line
+new_image=$(echo "$result" | grep "^uploaded:" | awk '{print $2}')
+
+# Example:
+# Input:  uploaded:  registry.lazycat.cloud/czyt/engigu/baihu:45666f85198d186d
+# Output: registry.lazycat.cloud/czyt/engigu/baihu:45666f85198d186d
 
 # Update manifest files with commented original image
 # Keep original image as comment for reference
