@@ -37,6 +37,16 @@ preferences:
     description: Set application.background_task to true by default for long-running background services
     type: boolean
     default: false
+  - id: package_prefix
+    name: Package Name Prefix
+    description: Default package name prefix for applications (community.lazycat.app, cloud.lazycat.app, or custom)
+    type: string
+    default: cloud.lazycat.app
+  - id: generate_compose_override
+    name: Generate compose_override
+    description: Generate compose_override section in lzc-build.yml for unsupported Docker Compose parameters
+    type: boolean
+    default: true
 ---
 
 # LazyCat App Publisher
@@ -373,6 +383,114 @@ if is_internal:
         return f"/lzcapp/cache/{service}:{container}"
 ```
 
+### 5. Package Name Generation
+```python
+def generate_package_name(app_name, user_prefix=None):
+    """
+    生成包名，支持用户偏好
+    
+    优先级：
+    1. 用户明确指定的前缀
+    2. 用户保存的偏好
+    3. 默认值 (cloud.lazycat.app)
+    """
+    if user_prefix:
+        prefix = user_prefix
+    else:
+        # 从偏好中读取，默认为 cloud.lazycat.app
+        prefix = get_preference('package_prefix', 'cloud.lazycat.app')
+    
+    # 清理应用名称
+    clean_name = app_name.lower().replace(' ', '-').replace('_', '-')
+    return f"{prefix}.{clean_name}"
+
+# 示例：
+# app_name="My App", prefix="cloud.lazycat.app" → cloud.lazycat.app.my-app
+# app_name="My App", prefix="community.lazycat.app" → community.lazycat.app.my-app
+# app_name="My App", prefix="com.acme.app" → com.acme.app.my-app
+```
+
+### 6. compose_override 智能检测
+```python
+def detect_compose_override_needed(services):
+    """
+    检测是否需要 compose_override
+    
+    需要 compose_override 的场景：
+    1. 挂载主机设备 (devices)
+    2. 挂载非 /lzcapp 路径的 volumes
+    3. GPU/USB/KVM 加速配置
+    4. 特殊网络配置
+    """
+    needs_override = False
+    override_config = {}
+    
+    for service_name, service_config in services.items():
+        service_override = {}
+        
+        # 检测设备挂载
+        if 'devices' in service_config:
+            service_override['devices'] = service_config['devices']
+            needs_override = True
+        
+        # 检测非标准 volumes
+        if 'volumes' in service_config:
+            non_lzcapp_volumes = [
+                v for v in service_config['volumes']
+                if not v.startswith('/lzcapp/')
+            ]
+            if non_lzcapp_volumes:
+                service_override['volumes'] = non_lzcapp_volumes
+                needs_override = True
+        
+        # 检测 GPU 配置
+        if 'deploy' in service_config and 'resources' in service_config['deploy']:
+            service_override['deploy'] = service_config['deploy']
+            needs_override = True
+        
+        if service_override:
+            override_config[service_name] = service_override
+    
+    return needs_override, override_config
+
+# 示例：
+# 普通服务 → needs_override=False, override_config={}
+# 需要 GPU 的服务 → needs_override=True, override_config={'app': {'deploy': {...}}}
+```
+
+### 7. background_task 智能判断
+```python
+def should_set_background_task(services, user_preference=False):
+    """
+    判断是否应该设置 background_task
+    
+    规则：
+    1. 用户偏好优先
+    2. 检测应用类型（是否为后台服务）
+    """
+    if user_preference:
+        return True
+    
+    # 检测关键字
+    background_keywords = [
+        'sync', 'scheduler', 'cron', 'worker',
+        'downloader', 'aria2', 'qbittorrent',
+        'background', 'daemon'
+    ]
+    
+    for service_config in services.values():
+        image = service_config.get('image', '').lower()
+        if any(keyword in image for keyword in background_keywords):
+            return True
+    
+    return False
+
+# 示例：
+# yuque-sync → True (包含 'sync')
+# nginx → False (普通 web 服务)
+# aria2 → True (包含 'aria2')
+```
+
 ## 📈 Performance Metrics
 
 | Metric | Standard | Smart | Improvement |
@@ -516,6 +634,83 @@ application:
   subdomain: myapp
   routes:
     - /=http://myapp.cloud.lazycat.app.myapp.lzcapp:8080
+```
+
+### ✅ Best Practices - Using New Features
+
+**1. Package Name Prefix**
+```yaml
+# ✅ Use preference-based package naming
+# First time: Skill will ask for your preference
+# - cloud.lazycat.app (official apps)
+# - community.lazycat.app (community apps)
+# - custom prefix (e.g., com.yourcompany.app)
+
+package: cloud.lazycat.app.myapp  # Based on your saved preference
+```
+
+**2. Background Task Configuration**
+```yaml
+# ✅ For background services (sync, scheduler, downloader)
+application:
+  subdomain: yuque-sync
+  background_task: true  # Prevents auto-sleep
+  # No HTTP routes needed for background tasks
+
+# ✅ For web applications
+application:
+  subdomain: mywebapp
+  background_task: false  # or omit (default)
+  upstreams:
+    - location: /
+      backend: http://web:8080/
+```
+
+**3. Public Path Configuration**
+```yaml
+# ✅ When preference enabled (default)
+application:
+  subdomain: myapp
+  public_path:
+    - /  # Automatically added
+  upstreams:
+    - location: /
+      backend: http://web:8080/
+
+# ✅ For apps with specific public paths
+application:
+  public_path:
+    - /
+    - /public
+    - /assets
+```
+
+**4. compose_override Usage**
+```yaml
+# lzc-build.yml
+# ✅ Only generated when needed
+
+# Example 1: GPU acceleration
+compose_override:
+  services:
+    ai-app:
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu]
+
+# Example 2: Device mounting
+compose_override:
+  services:
+    iot-app:
+      devices:
+        - /dev/ttyUSB0:/dev/ttyUSB0
+        - /dev/ttyACM0:/dev/ttyACM0
+
+# ❌ Not generated for standard apps (no special requirements)
 ```
 
 ### ❌ Avoid - Common Mistakes
@@ -971,6 +1166,82 @@ application:
 - Interactive applications
 - Applications where auto-stop on inactivity is acceptable
 
+### Package Name Prefix (default: cloud.lazycat.app)
+
+**ID**: `package_prefix`
+
+This preference allows you to set the default package name prefix for your applications. The skill will remember your choice and use it for future conversions.
+
+**Available Options**:
+1. `cloud.lazycat.app` - Official LazyCat Cloud apps (default)
+2. `community.lazycat.app` - Community contributed apps
+3. Custom prefix - Enter your own package prefix (e.g., `com.yourcompany.app`)
+
+**Example Output**:
+```yaml
+# With cloud.lazycat.app (default):
+package: cloud.lazycat.app.myapp
+
+# With community.lazycat.app:
+package: community.lazycat.app.myapp
+
+# With custom prefix (e.g., com.acme.app):
+package: com.acme.app.myapp
+```
+
+**How it works**:
+- First time: The skill will ask you to choose a prefix
+- Future uses: The skill remembers your choice
+- You can always override by specifying a different prefix in your request
+
+**When to use each**:
+- `cloud.lazycat.app` - For official or verified applications
+- `community.lazycat.app` - For community-contributed applications
+- Custom prefix - For enterprise or personal application namespaces
+
+### Generate compose_override (default: true)
+
+**ID**: `generate_compose_override`
+
+This preference controls whether to generate the `compose_override` section in `lzc-build.yml` file. The `compose_override` section allows you to override unsupported Docker Compose parameters.
+
+**Example Output** (when enabled and overrides are needed):
+```yaml
+# lzc-build.yml
+manifest: ./lzc-manifest.yml
+pkgout: ./
+icon: ./icon.png
+
+# compose_override - 覆盖不支持的 Docker Compose 参数
+compose_override:
+  services:
+    app:
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      devices:
+        - /dev/ttyUSB0:/dev/ttyUSB0
+```
+
+**Example Output** (when no overrides are needed):
+```yaml
+# lzc-build.yml
+manifest: ./lzc-manifest.yml
+pkgout: ./
+icon: ./icon.png
+
+# No compose_override section generated
+```
+
+**Smart Detection**:
+The skill intelligently detects when `compose_override` is needed:
+- ✅ Generate if services use unsupported parameters (devices, volumes outside /lzcapp, special configs)
+- ❌ Skip if all parameters are natively supported by LazyCat
+
+**When to disable**:
+- You want to manually manage `compose_override`
+- You prefer minimal configuration files
+- Your applications never need Docker-specific overrides
+
 **How to configure**: You can configure these preferences in your Claude Code settings under skill preferences.
 
 ## How to Use
@@ -1117,8 +1388,24 @@ icon: ./icon.png
 # contentdir: ./dist
 
 # compose_override - 覆盖不支持的 Docker Compose 参数
+# 注意：此部分仅在有需要覆盖的参数时才生成
 compose_override:
-  services: {}
+  services:
+    app:
+      # 示例：挂载 Docker socket
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      # 示例：挂载设备
+      devices:
+        - /dev/ttyUSB0:/dev/ttyUSB0
+      # 示例：GPU 加速
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu]
 ```
 
 **关键字段说明：**
@@ -1127,6 +1414,16 @@ compose_override:
 - **icon** (必需): 512x512 PNG 应用图标
 - **contentdir** (可选): 额外内容目录
 - **compose_override** (可选): 覆盖不支持的参数
+
+**compose_override 使用场景：**
+1. **挂载主机资源**：Docker socket、设备文件等
+2. **硬件加速**：GPU、USB、KVM 等设备
+3. **特殊配置**：LazyCat 不直接支持的 Docker Compose 参数
+
+**智能生成规则：**
+- ✅ 当检测到需要覆盖的参数时，自动生成 `compose_override` 部分
+- ❌ 如果所有参数都被 LazyCat 原生支持，则不生成此部分
+- 🔧 用户可以根据需要手动添加或修改
 
 **Note**: Icon must be provided by user as a 512x512 PNG file named `icon.png`.
 
