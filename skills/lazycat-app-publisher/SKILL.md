@@ -1891,6 +1891,23 @@ lzc-cli project build -o app-1.0.0.lpk
 ```
 
 ### Stage 2: Image Copy to LazyCat Registry
+
+**🆕 Interactive Prompt Feature:**
+```
+The skill will automatically:
+1. 🔍 Detect all Docker images in your manifest
+2. 💬 Prompt: "是否需要拷贝镜像到懒猫的registry？(Copy images to LazyCat registry?)"
+3. ✅ If confirmed:
+   - Execute lzc-cli appstore copy-image for each image
+   - Auto-update manifest with new registry images
+   - Comment out original images for reference
+   - Rebuild package with new images
+4. ❌ If declined:
+   - Skip image copy step
+   - Keep original images in manifest
+```
+
+**Manual Image Copy:**
 ```bash
 # Copy image to official LazyCat registry
 lzc-cli appstore copy-image heizicao/yuque-sync:latest
@@ -1905,12 +1922,14 @@ lzc-cli appstore copy-image heizicao/yuque-sync:latest
 - ✅ Each execution re-pulls the image
 - ✅ Tag based on IMAGE_ID (stable)
 - ✅ Must be referenced by app to avoid garbage collection
+- ✅ Original images preserved as comments for reference
 
 ### Stage 3: Auto-Update Manifest & Rebuild
 ```bash
 # Script automatically updates manifest.yml or lzc-manifest.yml
 # Old: image: heizicao/yuque-sync:latest
 # New: image: registry.lazycat.cloud/czyt/heizicao/yuque-sync:8491074e73af38d8
+#      # heizicao/yuque-sync:latest  <-- Original image commented out
 
 # Then rebuild with new image
 lzc-cli project build -o app-1.0.1.lpk
@@ -1921,9 +1940,35 @@ lzc-cli project build -o app-1.0.1.lpk
 # Extract new image from copy-image output
 new_image=$(echo "$result" | grep "lazycat-registry:" | sed 's/.*lazycat-registry: //')
 
-# Update manifest files
-sed -i "s|image: .*|image: $new_image|" lzc-manifest.yml
-sed -i "s|image: .*|image: $new_image|" manifest.yml
+# Update manifest files with commented original image
+# Keep original image as comment for reference
+update_image_in_manifest() {
+    local manifest_file=$1
+    local new_image=$2
+    
+    # Find the image line and comment it out, then add new image
+    sed -i "/image:/ {
+        h
+        s|image: \(.*\)|    # \1|
+        p
+        g
+        s|image: .*|image: $new_image|
+    }" "$manifest_file"
+}
+
+update_image_in_manifest "lzc-manifest.yml" "$new_image"
+update_image_in_manifest "manifest.yml" "$new_image"
+```
+
+**Result Example:**
+```yaml
+services:
+  baihu:
+    # ghcr.io/engigu/baihu:latest
+    image: registry.lazycat.cloud/czyt/engigu/baihu:45666f85198d186d
+    environment:
+      - TZ=Asia/Shanghai
+      - BH_SERVER_PORT=8052
 ```
 
 ### Stage 4: Publish to App Store
