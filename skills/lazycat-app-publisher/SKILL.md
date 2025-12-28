@@ -77,6 +77,7 @@ This skill helps you convert Docker Compose files and Docker commands into LazyC
 - **Image Management**: Guides through `lzc-cli appstore copy-image` process
 - **Auto Updates**: Automatically updates manifest with new registry images
 - **Version Management**: Supports both first-time and update scenarios
+- **App Store Check**: Automatically checks if the app already exists in LazyCat App Store before starting
 
 ## 🧠 Intelligent Analysis Logic
 
@@ -224,6 +225,58 @@ params:
 - ✅ 60% faster setup time
 
 ## 🚀 Usage Examples
+
+### Example 0: Automatic App Store Check (New!)
+
+**User Request:**
+```
+帮我把 Tailscale 的 docker-compose.yml 转换成懒猫应用
+```
+
+**Skill Response (Automatic Check):**
+```
+🔍 正在检查懒猫应用商店...
+
+⚠️  应用商店检查结果
+
+找到 1 个完全匹配的应用：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 Tailscale
+   包名: cloud.lazycat.app.tailscale
+   版本: 1.92.3
+   作者: 虫子樱桃 (czyt)
+   简介: 将您的设备和用户连接到您专属的安全虚拟专用网络
+   描述: Tailscale 是一种基于 WireGuard 的虚拟组网工具...
+   下载: 309 次
+   评分: ⭐⭐⭐⭐ (4.0/5.0，共 3 个评价)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+另外找到 3 个相似应用：
+1. Chat-Tails 终端聊天室 (cloud.lazycat.app.chat-tails)
+2. VeilNet Portal (org.veilnet.portal)
+3. XPipe Webtop (cloud.lazycat.app.xpipe)
+
+⚠️  此应用已存在于商店中。建议：
+1. ❌ 停止 - 直接从商店安装已有应用
+2. 🤝 贡献 - 联系原作者 czyt 改进现有应用
+3. ✏️  继续 - 如果您要创建不同的实现，请使用不同的名称
+
+是否仍要继续创建新应用？
+```
+
+**User Response Option 1 (Stop):**
+```
+不了，我直接用现有的
+```
+**Skill:** ✅ 好的，您可以直接在懒猫商店搜索安装 Tailscale 应用。
+
+**User Response Option 2 (Continue):**
+```
+继续，我要创建一个改进版本
+```
+**Skill:** ✅ 好的，请提供您的 docker-compose.yml 文件，我会帮您转换。建议使用不同的包名，如 `cloud.lazycat.app.tailscale-enhanced`。
+
+---
 
 ### Example 1: Standard Web App
 
@@ -786,22 +839,290 @@ services:
       interval: 30s
 ```
 
+## 🔍 App Store Existence Check (Automatic)
+
+### 🤖 Fully Automatic Checking
+
+**重要：这是一个自动执行的检查功能！**
+
+每当用户请求转换或创建应用时，技能会**自动**检查懒猫应用商店中是否已存在同名或相似的应用。用户无需主动请求检查，系统会在开始转换之前自动完成。
+
+检查完成后，技能会向用户展示结果并询问是否继续创建应用。
+
+### Workflow Integration
+
+```
+用户请求: "帮我转换这个 docker-compose.yml"
+   ↓
+🤖 自动执行: 应用商店检查
+   ↓ (检测应用名称，如 "Tailscale")
+   ↓
+🔍 自动搜索: https://search.lazycat.cloud/api/v1/app?keyword=Tailscale
+   ↓
+📊 展示结果: 
+   - ✅ 找到完全匹配 或
+   - 📋 找到相似应用 或
+   - ✅ 未找到重复
+   ↓
+❓ 询问用户: "是否继续创建？"
+   ↓
+   [用户确认] → 继续转换流程
+   [用户拒绝] → 停止，推荐使用现有应用
+```
+
+### How It Works
+
+**1. Search API Integration**
+```bash
+# API Endpoint
+GET https://search.lazycat.cloud/api/v1/app?keyword={app_name}&size=48
+
+# Response Format
+{
+  "errorCode": 0,
+  "message": "ok",
+  "data": {
+    "items": [
+      {
+        "id": 1055,
+        "package": "cloud.lazycat.app.tailscale",
+        "information": {
+          "name": "Tailscale",
+          "brief": "将您的设备和用户连接到您专属的安全虚拟专用网络。",
+          "description": "..."
+        },
+        "version": {
+          "name": "1.92.3",
+          "package": "cloud.lazycat.app.tailscale"
+        },
+        "count": {
+          "downloads": 309,
+          "likes": 0,
+          "comments": 3
+        }
+      }
+    ],
+    "total": 4
+  }
+}
+```
+
+**2. Smart Matching Logic**
+```python
+def check_app_exists(app_name):
+    """
+    Check if app exists in LazyCat App Store
+    
+    Returns:
+    - exact_match: App with exact same name
+    - similar_apps: Apps with similar names
+    - total_found: Total number of matches
+    """
+    # Search by keyword
+    url = f"https://search.lazycat.cloud/api/v1/app?keyword={app_name}&size=48"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        data = response.json()
+        items = data.get('data', {}).get('items', [])
+        
+        # Check for exact match
+        exact_match = None
+        similar_apps = []
+        
+        for item in items:
+            item_name = item.get('information', {}).get('name', '').lower()
+            search_name = app_name.lower()
+            
+            if item_name == search_name:
+                exact_match = item
+            else:
+                similar_apps.append(item)
+        
+        return {
+            'exact_match': exact_match,
+            'similar_apps': similar_apps,
+            'total_found': len(items)
+        }
+```
+
+**3. User Notification**
+
+When an app is found:
+```
+⚠️  应用商店检查结果 (App Store Check Results)
+
+找到 1 个完全匹配的应用：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 Tailscale
+   包名: cloud.lazycat.app.tailscale
+   版本: 1.92.3
+   简介: 将您的设备和用户连接到您专属的安全虚拟专用网络。
+   下载: 309 次
+   评分: ⭐⭐⭐⭐ (4.0)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  此应用已存在于商店中。建议：
+1. 如果您想使用此应用，可以直接从商店安装
+2. 如果您想改进此应用，可以联系原作者贡献代码
+3. 如果您想创建不同的实现，请使用不同的名称
+
+是否继续创建新应用？(y/n)
+```
+
+### Search Results Display
+
+**Exact Match Found:**
+```
+✅ 找到完全匹配: {app_name}
+   - Package: {package}
+   - Version: {version}
+   - Author: {author}
+   - Downloads: {downloads}
+   - Description: {brief}
+```
+
+**Similar Apps Found:**
+```
+📋 找到 {count} 个相似应用:
+
+1. {app_name_1}
+   Package: {package_1}
+   Brief: {brief_1}
+   
+2. {app_name_2}
+   Package: {package_2}
+   Brief: {brief_2}
+```
+
+**No Apps Found:**
+```
+✅ 应用商店中未找到同名应用，可以继续创建
+```
+
+### Example: Tailscale Check
+
+**Search Query:**
+```bash
+curl "https://search.lazycat.cloud/api/v1/app?keyword=Tailscale&size=48"
+```
+
+**Results:**
+- **Exact Match**: Tailscale (cloud.lazycat.app.tailscale)
+- **Similar Apps**: 
+  - Chat-Tails 终端聊天室 (cloud.lazycat.app.chat-tails)
+  - VeilNet Portal (org.veilnet.portal)
+
+**Recommendation:**
+```
+⚠️  发现已存在的 Tailscale 应用！
+
+已上架应用信息：
+- 版本: 1.92.3
+- 作者: 虫子樱桃 (czyt)
+- 下载: 309 次
+- 评分: 4.0/5.0 (3 评价)
+- 描述: Tailscale 是一种基于 WireGuard 的虚拟组网工具
+
+建议操作：
+1. ❌ 停止 - 直接使用现有应用
+2. 🤝 贡献 - 联系作者改进现有应用
+3. ✏️  继续 - 使用不同名称创建新应用
+```
+
+### API Response Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `id` | App ID | `1055` |
+| `package` | Package identifier | `cloud.lazycat.app.tailscale` |
+| `information.name` | App display name | `Tailscale` |
+| `information.brief` | Short description | `将您的设备...` |
+| `information.description` | Full description | `Tailscale 是一种...` |
+| `version.name` | Current version | `1.92.3` |
+| `create_user.nickname` | Author name | `虫子樱桃` |
+| `create_user.username` | Author username | `czyt` |
+| `count.downloads` | Download count | `309` |
+| `count.likes` | Like count | `0` |
+| `count.comments` | Comment count | `3` |
+| `rating.score` | Average rating | `4` |
+
+### Integration in Workflow
+
+The app existence check is automatically performed at **Step 0** before starting the conversion:
+
+```
+Step 0: 应用商店检查 (App Store Check)
+   ↓
+   [If exists] → Notify user → Ask to continue
+   ↓
+   [If not exists or user confirms] → Continue
+   ↓
+Step 1: Analyze docker-compose.yml
+   ↓
+Step 2: Classify services (internal/external)
+   ↓
+...
+```
+
+### Configuration
+
+**默认行为：自动检查**
+
+技能默认会在每次转换前自动检查应用是否存在。如果用户明确知道应用不存在，可以在请求中说明跳过检查：
+
+```
+请转换这个 docker-compose.yml（跳过商店检查，我确认没有重复）:
+[provide docker-compose.yml]
+```
+
+或者强制创建：
+```
+请转换这个 docker-compose.yml（即使存在也要创建）:
+[provide docker-compose.yml]
+```
+
+**正常情况下，用户无需做任何特殊说明，技能会自动执行检查。**
+
+### Benefits
+
+✅ **Prevents Duplicate Work**: Saves time by identifying existing apps
+✅ **Encourages Collaboration**: Suggests contributing to existing apps
+✅ **Maintains Quality**: Prevents app store fragmentation
+✅ **User-Friendly**: Clear notifications and recommendations
+✅ **Flexible**: Users can choose to continue or stop
+
+### Best Practices
+
+1. **Always Check First**: Let the skill check before starting conversion
+2. **Review Existing Apps**: Examine similar apps to learn best practices
+3. **Contact Authors**: Consider contributing to existing apps instead of duplicating
+4. **Use Unique Names**: If creating similar app, use distinctive name
+5. **Document Differences**: Clearly explain why your app is different
+
 ## 🔄 Complete Workflow
 
 ```
-1. Analyze docker-compose.yml
+Step 0: 🤖 自动应用商店检查 (Automatic App Store Check)
    ↓
-2. Classify services (internal/external)
+   检测应用名称 → 搜索商店 → 展示结果
    ↓
-3. Identify parameters (auto/user/hardcoded)
+   [如果找到] → 询问用户是否继续
+   [如果未找到] → 直接继续
    ↓
-4. Generate optimized manifest
+Step 1: Analyze docker-compose.yml
    ↓
-5. Generate simplified params
+Step 2: Classify services (internal/external)
    ↓
-6. Create build files
+Step 3: Identify parameters (auto/user/hardcoded)
    ↓
-7. Build and publish
+Step 4: Generate optimized manifest
+   ↓
+Step 5: Generate simplified params
+   ↓
+Step 6: Create build files
+   ↓
+Step 7: Build and publish
 ```
 
 ## 📚 Related Files

@@ -5,12 +5,13 @@ A Claude Code skill for converting Docker Compose files and Docker commands into
 ## 🎯 What This Skill Does
 
 This skill helps you:
-1. **Convert Docker to LazyCat**: Docker Compose/Run → `lzc-manifest.yml`, `lzc-build.yml`, `lzc-deploy-params.yml`
-2. **Setup Wizard Configuration**: Multi-language parameter definitions (English params + Chinese locales)
-3. **Image Management**: `lzc-cli appstore copy-image` workflow
-4. **Auto-Update Manifest**: Automatically updates manifest after image copy
-5. **Complete Publish Workflow**: 4-stage process from build to publish
-6. **Automation Scripts**: Full `build.sh` with interactive menu
+1. **🔍 Automatic App Store Check**: Checks if the app already exists before conversion (NEW!)
+2. **Convert Docker to LazyCat**: Docker Compose/Run → `lzc-manifest.yml`, `lzc-build.yml`, `lzc-deploy-params.yml`
+3. **Setup Wizard Configuration**: Multi-language parameter definitions (English params + Chinese locales)
+4. **Image Management**: `lzc-cli appstore copy-image` workflow
+5. **Auto-Update Manifest**: Automatically updates manifest after image copy
+6. **Complete Publish Workflow**: 4-stage process from build to publish
+7. **Automation Scripts**: Full `build.sh` with interactive menu
 
 ## 📦 What Gets Generated
 
@@ -72,6 +73,77 @@ icon: ./icon.png  # User-provided 512x512 PNG
 # Menu: 1-Build, 2-Copy Image, 3-Publish, 4-One-Click, 5-Info, 6-Exit
 # Auto-updates manifest after image copy
 # Supports first-time and update publishing
+```
+
+## 🔍 Automatic App Store Check (NEW!)
+
+**This is an automatic feature that runs before every conversion!**
+
+### How It Works
+
+Whenever you request to convert or create an application, the skill **automatically**:
+1. 🔍 Detects the application name from your docker-compose.yml or description
+2. 🌐 Searches the LazyCat App Store API: `https://search.lazycat.cloud/api/v1/app?keyword={app_name}`
+3. 📊 Analyzes results for exact matches and similar apps
+4. 💬 Presents findings to you with detailed information
+5. ❓ Asks if you want to continue creating the app
+
+### What You See
+
+**If an exact match is found:**
+```
+⚠️  应用商店检查结果
+
+找到 1 个完全匹配的应用：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 Tailscale
+   包名: cloud.lazycat.app.tailscale
+   版本: 1.92.3
+   作者: 虫子樱桃 (czyt)
+   下载: 309 次
+   评分: ⭐⭐⭐⭐ (4.0)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+建议：
+1. ❌ 停止 - 直接安装现有应用
+2. 🤝 贡献 - 联系作者改进
+3. ✏️  继续 - 使用不同名称
+
+是否继续创建？
+```
+
+**If no match is found:**
+```
+✅ 应用商店中未找到同名应用，可以继续创建
+```
+
+### Benefits
+
+✅ **Prevents Duplicate Work**: Saves your time by identifying existing apps  
+✅ **Encourages Collaboration**: Suggests contributing instead of duplicating  
+✅ **Maintains Quality**: Prevents app store fragmentation  
+✅ **Zero Configuration**: Works automatically, no setup needed  
+
+### Example Usage
+
+```
+User: 帮我转换 Tailscale 的 docker-compose.yml
+
+Skill: 🔍 正在检查懒猫应用商店...
+       ⚠️  发现已存在 Tailscale 应用！
+       [Shows app details]
+       是否继续创建？
+
+User: 不了，我直接用现有的
+
+Skill: ✅ 好的，您可以直接在商店搜索安装
+```
+
+**Skip Check (Optional):**
+If you're certain the app doesn't exist:
+```
+请转换这个 docker-compose.yml（跳过商店检查）:
+[provide file]
 ```
 
 ## ⚙️ Skill Preferences
