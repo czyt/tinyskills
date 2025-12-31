@@ -2430,7 +2430,82 @@ fi
 
 ## ⚠️ Critical Rules & Gotchas
 
-### 1. Setup Wizard Parameter Format
+### 🚨 TOP 2 CRITICAL RULES (Most Important!)
+
+#### ❌ Rule 1: DO NOT Auto-Add Healthcheck
+**Problem**: Original docker-compose.yml has no healthcheck, adding one causes startup failure
+
+**Why it fails:**
+- Container may lack curl/wget tools for checking
+- App startup time may exceed expectations  
+- Port may not be immediately available
+
+**Correct approach:**
+```yaml
+# ✅ If original config has no healthcheck, DON'T add one
+services:
+  web:
+    image: nginx:alpine
+    # No healthcheck added
+```
+
+**When to add healthcheck:**
+- ✅ Original docker-compose.yml already has it
+- ✅ User explicitly requests to add healthcheck
+- ✅ AND you've verified the container has required tools (curl/wget)
+- ✅ AND you've tested startup timing is appropriate
+
+#### ❌ Rule 2: binds Only Supports Directories, Not Files
+**Problem**: binds only supports directory mapping, not individual files
+
+**Wrong example:**
+```yaml
+# ❌ NOT supported
+binds:
+  - /lzcapp/pkg/nginx.conf:/etc/nginx/nginx.conf
+```
+
+**Correct solution:** Use contentdir + setup_script
+```yaml
+# lzc-build.yml
+contentdir: ./content
+
+# Local: content/nginx.conf
+# Container: /lzcapp/pkg/content/nginx.conf (read-only)
+
+# lzc-manifest.yml
+services:
+  web:
+    setup_script: |
+      cp /lzcapp/pkg/content/nginx.conf /etc/nginx/nginx.conf
+```
+
+**For multiple config files:**
+```yaml
+# Local structure:
+content/
+├── nginx.conf
+├── config.yaml
+└── certs/
+    └── cert.pem
+
+# Container structure:
+/lzcapp/pkg/content/
+├── nginx.conf
+├── config.yaml
+└── certs/
+    └── cert.pem
+
+# setup_script:
+setup_script: |
+  cp -r /lzcapp/pkg/content/* /etc/app/
+```
+
+---
+
+### Additional Important Rules
+
+### 3. Setup Wizard Parameter Format
 ```yaml
 # ❌ WRONG - Chinese in params
 params:
@@ -2460,7 +2535,7 @@ locales:
 - **Why lowercase?**: Better readability, consistent with modern conventions, easier to maintain
 - **Why English in params?**: System automatically switches based on user language preference
 
-### 2. Image Must Be in LazyCat Registry
+### 4. Image Must Be in LazyCat Registry
 ```yaml
 # ❌ WRONG - Public image
 services:
@@ -2475,7 +2550,7 @@ services:
 
 **Rule:** All images must be copied using `lzc-cli appstore copy-image`.
 
-### 3. Manifest Auto-Update
+### 5. Manifest Auto-Update
 ```bash
 # After copy-image, script automatically:
 sed -i "s|image: .*|image: $new_image|" lzc-manifest.yml
@@ -2485,7 +2560,7 @@ sed -i "s|image: .*|image: $new_image|" manifest.yml
 lzc-cli project build -o release.lpk
 ```
 
-### 4. Version Management
+### 6. Version Management
 ```yaml
 # First release
 version: 1.0.0
@@ -2502,7 +2577,7 @@ version: 2.0.0
 
 **Always increment version number before publishing update.**
 
-### 5. Storage Path Rules
+### 7. Storage Path Rules
 ```yaml
 # ✅ Correct paths
 binds:
@@ -2516,7 +2591,7 @@ binds:
   - /home/user/data:/data       # Absolute path
 ```
 
-### 6. Background Task vs HTTP App
+### 8. Background Task vs HTTP App
 ```yaml
 # Background task (no HTTP)
 application:
@@ -2532,9 +2607,24 @@ application:
     - /=http://mywebapp.cloud.lazycat.app.myapp.lzcapp:80
 ```
 
----
+### 9. Service Communication Rules
+```yaml
+# ❌ WRONG - Using localhost
+services:
+  backend:
+    environment:
+      - API_URL=http://localhost:3000
 
-## 🎯 Complete File Structure
+# ✅ CORRECT - Using service names
+services:
+  backend:
+    environment:
+      - API_URL=http://api:3000
+```
+
+**Rule:** Services must communicate using service names, NOT localhost.
+
+---
 
 ```
 myapp/
