@@ -466,6 +466,249 @@ locales:
     description: "App Description"
 ```
 
+## 🔐 OIDC SSO Integration (LazyCat v1.3.5+)
+
+### Overview
+LazyCat v1.3.5+ provides **unified OIDC support** with automatic configuration. Developers only need to set the callback path, and LazyCat automatically generates all OIDC parameters.
+
+### Core Configuration (2 Steps)
+
+#### 1. Set OIDC Redirect Path (REQUIRED)
+
+```yaml
+# In lzc-manifest.yml
+application:
+  subdomain: myapp
+  oidc_redirect_path: /api/v1/auth/sso/oidc/callback  # REQUIRED!
+```
+
+**⚠️ CRITICAL RULE:**
+- ✅ **OIDC environment variables are ONLY injected when `oidc_redirect_path` is set**
+- ❌ Without this field, **NO OIDC variables** will be available
+- ⚠️ If unsure, use common paths and check browser errors for the correct value
+
+**Common callback paths:**
+- `/oauth2/callback`
+- `/auth/oidc.callback`
+- `/api/v1/auth/sso/oidc/callback`
+- `/sso/callback`
+
+#### 2. Use LazyCat-Generated Environment Variables
+```yaml
+services:
+  app:
+    image: myapp:latest
+    environment:
+      # Required - LazyCat generates these automatically
+      - OIDC_CLIENT_ID=${LAZYCAT_AUTH_OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${LAZYCAT_AUTH_OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER_URI=${LAZYCAT_AUTH_OIDC_ISSUER_URI}
+      - OIDC_AUTH_URI=${LAZYCAT_AUTH_OIDC_AUTH_URI}
+      - OIDC_TOKEN_URI=${LAZYCAT_AUTH_OIDC_TOKEN_URI}
+      - OIDC_USERINFO_URI=${LAZYCAT_AUTH_OIDC_USERINFO_URI}
+```
+
+### Environment Variable Mapping
+
+| LazyCat Generated | App Receives | Required | Description |
+|-------------------|--------------|----------|-------------|
+| `LAZYCAT_AUTH_OIDC_CLIENT_ID` | `OIDC_CLIENT_ID` | ✅ Yes | Client ID |
+| `LAZYCAT_AUTH_OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET` | ✅ Yes | Client Secret |
+| `LAZYCAT_AUTH_OIDC_ISSUER_URI` | `OIDC_ISSUER_URI` | ✅ Yes | OIDC Issuer URI |
+| `LAZYCAT_AUTH_OIDC_AUTH_URI` | `OIDC_AUTH_URI` | ✅ Yes | Authorization endpoint |
+| `LAZYCAT_AUTH_OIDC_TOKEN_URI` | `OIDC_TOKEN_URI` | ✅ Yes | Token endpoint |
+| `LAZYCAT_AUTH_OIDC_USERINFO_URI` | `OIDC_USERINFO_URI` | ✅ Yes | User info endpoint |
+
+### Complete Example
+
+#### Input: Docker Compose
+```yaml
+services:
+  app:
+    image: myapp:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - OIDC_CLIENT_ID=myapp-client
+      - OIDC_CLIENT_SECRET=secret
+```
+
+#### Output: LazyCat Manifest
+```yaml
+name: MyApp
+package: cloud.lazycat.app.myapp
+version: 1.0.0
+min_os_version: 1.3.8
+
+application:
+  subdomain: myapp
+  oidc_redirect_path: /auth/oidc.callback  # Added for OIDC support
+  upstreams:
+    - location: /
+      backend: http://app:8080/
+
+services:
+  app:
+    image: myapp:latest
+    environment:
+      # OIDC - Automatically injected by LazyCat
+      - OIDC_CLIENT_ID=${LAZYCAT_AUTH_OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${LAZYCAT_AUTH_OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER_URI=${LAZYCAT_AUTH_OIDC_ISSUER_URI}
+      - OIDC_AUTH_URI=${LAZYCAT_AUTH_OIDC_AUTH_URI}
+      - OIDC_TOKEN_URI=${LAZYCAT_AUTH_OIDC_TOKEN_URI}
+      - OIDC_USERINFO_URI=${LAZYCAT_AUTH_OIDC_USERINFO_URI}
+```
+
+### Platform Configuration Steps
+
+#### 1. Configure OIDC Provider in LazyCat
+```
+Platform Settings → SSO Integration → Add OIDC Provider
+```
+
+**Required information:**
+- Issuer URL
+- Client ID
+- Client Secret
+- Callback URL: `https://your-domain.com/api/v1/auth/sso/oidc/callback`
+
+#### 2. Enable SSO for Your App
+```
+App Management → MyApp → SSO Settings → Enable OIDC
+```
+
+#### 3. Deploy Application
+LazyCat automatically:
+- ✅ Injects all OIDC environment variables
+- ✅ Configures callback routing
+- ✅ Manages key security
+- ✅ Handles user authentication
+
+### Supported OIDC Providers
+
+✅ **Authelia**
+```yaml
+# Authelia config
+identity_providers:
+  oidc:
+    clients:
+      - client_id: myapp-client
+        redirect_uris:
+          - https://your-domain.com/api/v1/auth/sso/oidc/callback
+```
+
+✅ **Authentik**
+```yaml
+# Authentik Provider
+Name: MyApp
+Client ID: (auto-generated)
+Redirect URIs: https://your-domain.com/api/v1/auth/sso/oidc/callback
+```
+
+✅ **Keycloak**
+```yaml
+# Keycloak Client
+Client ID: myapp
+Access Type: confidential
+Valid Redirect URIs: https://your-domain.com/api/v1/auth/sso/oidc/callback
+```
+
+### Workflow
+
+```
+User accesses MyApp
+    ↓
+App detects no login
+    ↓
+Redirects to LazyCat SSO endpoint
+    ↓
+LazyCat redirects to OIDC provider
+    ↓
+User logs in at OIDC provider
+    ↓
+OIDC provider redirects to LazyCat callback
+    ↓
+LazyCat validates token
+    ↓
+LazyCat injects user info into MyApp
+    ↓
+User logged in successfully
+```
+
+### Security Features
+
+✅ **Key Management**
+- Keys securely stored by LazyCat
+- Automatic rotation support
+- Never exposed to users
+
+✅ **Callback Validation**
+- Strict URI validation
+- Prevents redirect attacks
+- Supports multiple domains
+
+✅ **User Synchronization**
+- Automatic user creation (optional)
+- User info sync
+- Group mapping support
+
+### Best Practices
+
+1. **Test Environment First**
+```bash
+# Configure test OIDC provider
+# Deploy test app
+# Verify login flow
+# Check user sync
+```
+
+2. **Production Configuration**
+```bash
+# Use production-grade OIDC provider
+# Enable HTTPS
+# Configure MFA
+# Monitor login logs
+```
+
+3. **Troubleshooting**
+- Check OIDC Issuer URL
+- Verify Client ID/Secret
+- Confirm callback URL matches
+- Review LazyCat platform logs
+
+### Integration Checklist
+
+- [ ] Set `application.oidc_redirect_path` in manifest
+- [ ] Configure OIDC provider in LazyCat platform
+- [ ] Add OIDC environment variables to services
+- [ ] Test login flow
+
+### Example: Agam Space Integration
+
+```yaml
+# lzc-manifest.yml
+application:
+  subdomain: agam
+  oidc_redirect_path: /api/v1/auth/sso/oidc/callback  # Required!
+  upstreams:
+    - location: /
+      backend: http://agam:3331/
+
+services:
+  agam:
+    image: agamspace/agam-space:latest
+    environment:
+      - OIDC_CLIENT_ID=${LAZYCAT_AUTH_OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${LAZYCAT_AUTH_OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER_URI=${LAZYCAT_AUTH_OIDC_ISSUER_URI}
+      - OIDC_AUTH_URI=${LAZYCAT_AUTH_OIDC_AUTH_URI}
+      - OIDC_TOKEN_URI=${LAZYCAT_AUTH_OIDC_TOKEN_URI}
+      - OIDC_USERINFO_URI=${LAZYCAT_AUTH_OIDC_USERINFO_URI}
+```
+
+**Result**: Zero manual configuration needed. LazyCat handles everything automatically.
+
 ## 🚫 Limitations
 
 ### Not Supported
