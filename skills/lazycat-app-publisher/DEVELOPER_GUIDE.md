@@ -87,7 +87,154 @@ docker的镜像地址有很多.我常用的有
 
 ### 自行通过SDK开发的项目
 
-Todo
+使用 Go-SDK 开发的懒猫应用不需要 Docker 镜像，而是直接运行编译好的二进制文件。完整教程参见博客文章 [懒猫微服 Go-SDK 使用指南](/post/lazycat-go-sdk-usage-guide/)。
+
+#### 项目结构
+
+```
+your-app/
+├── cmd/
+│   └── your-app/
+│       └── main.go               # 应用入口
+├── internal/
+│   ├── web/
+│   │   └── server.go             # Web 服务器配置与路由
+│   ├── handlers/                  # HTTP handlers，调用 SDK
+│   ├── biz/                       # 业务逻辑与数据库操作
+│   ├── auth/
+│   │   └── oidc.go               # OIDC 认证
+│   └── ent/
+│       └── schema/               # ent ORM schema 定义
+├── go.mod
+├── manifest.yml
+├── lzc-deploy-params.yml          # 可选
+├── lzc-build.yml
+└── icon.png
+```
+
+#### SDK 依赖
+
+```go
+require (
+    gitee.com/linakesi/lzc-sdk v0.0.0-20250307093731-41fc0a4beab9
+    google.golang.org/grpc v1.63.2
+)
+```
+
+#### 核心用法：APIGateway
+
+所有 SDK 调用都通过 `APIGateway` 进行：
+
+```go
+import (
+    gohelper "gitee.com/linakesi/lzc-sdk/lang/go"
+    "gitee.com/linakesi/lzc-sdk/lang/go/sys"
+    "gitee.com/linakesi/lzc-sdk/lang/go/common"
+    "google.golang.org/grpc/metadata"
+)
+
+// 创建带用户信息的 Context
+ctx := context.Background()
+ctx = metadata.AppendToOutgoingContext(ctx, "x-hc-user-id", userID)
+
+// 创建 Gateway
+gw, err := gohelper.NewAPIGateway(ctx)
+if err != nil {
+    return err
+}
+defer gw.Close()
+
+// 调用各种服务
+// gw.PkgManager  - 应用管理（查询/启动/暂停应用）
+// gw.Users       - 用户管理（查询用户信息）
+// gw.Box         - 设备管理（LED控制/关机/重启）
+```
+
+#### 主要 API
+
+**应用管理：**
+```go
+// 查询应用列表
+resp, _ := gw.PkgManager.QueryApplication(ctx, &sys.QueryApplicationRequest{})
+// 启动应用
+gw.PkgManager.Resume(ctx, &sys.AppInstance{Appid: appID, Uid: userID})
+// 暂停应用
+gw.PkgManager.Pause(ctx, &sys.AppInstance{Appid: appID, Uid: userID})
+```
+
+**用户管理：**
+```go
+userInfo, _ := gw.Users.QueryUserInfo(ctx, &common.UserID{Uid: userID})
+// userInfo.Nickname, userInfo.Avatar
+```
+
+**设备管理：**
+```go
+// 查询设备信息
+boxInfo, _ := gw.Box.QueryInfo(ctx, nil)
+// 控制 LED
+gw.Box.ChangePowerLed(ctx, &users.ChangePowerLedRequest{PowerLed: true})
+// 关机/重启
+gw.Box.Shutdown(ctx, &users.ShutdownRequest{Action: users.ShutdownRequest_Poweroff})
+gw.Box.Shutdown(ctx, &users.ShutdownRequest{Action: users.ShutdownRequest_Reboot})
+```
+
+#### manifest.yml 配置要点
+
+SDK 应用使用 `backend_launch_command` 而非 Docker 镜像：
+
+```yaml
+name: 你的应用名
+package: community.lazycat.app.your-app
+version: 1.0.0
+min_os_version: 1.3.8
+application:
+  subdomain: your-app
+  oidc_redirect_path: /auth/oidc/callback
+  public_path:
+    - /
+  upstreams:
+    - location: /
+      backend: http://127.0.0.1:8080/
+      backend_launch_command: /lzcapp/pkg/content/your-app
+  environment:
+    - LAZYCAT_AUTH_OIDC_CLIENT_ID=${LAZYCAT_AUTH_OIDC_CLIENT_ID}
+    - LAZYCAT_AUTH_OIDC_CLIENT_SECRET=${LAZYCAT_AUTH_OIDC_CLIENT_SECRET}
+    - LAZYCAT_AUTH_OIDC_AUTH_URI=${LAZYCAT_AUTH_OIDC_AUTH_URI}
+    - LAZYCAT_AUTH_OIDC_TOKEN_URI=${LAZYCAT_AUTH_OIDC_TOKEN_URI}
+    - LAZYCAT_AUTH_OIDC_USERINFO_URI=${LAZYCAT_AUTH_OIDC_USERINFO_URI}
+    - LAZYCAT_APP_DOMAIN=${LAZYCAT_APP_DOMAIN}
+    - DB_PATH=/lzcapp/var/data/your-app.db
+```
+
+#### lzc-build.yml 配置
+
+```yaml
+buildscript: ./build.sh
+manifest: ./manifest.yml
+contentdir: ./dist          # 编译产物目录
+pkgout: ./
+icon: ./icon.png
+devshell:
+  routes:
+    - /=http://127.0.0.1:8080
+  dependencies:
+    - go
+  setupscript: |
+    export GOPROXY=https://goproxy.cn,direct
+```
+
+#### 认证方式
+
+懒猫微服自动注入 OIDC 环境变量，应用需实现：
+1. 读取 `x-hc-user-id` Header（系统网关注入）
+2. 回退到 OIDC Session（用户直接浏览器访问时）
+3. 中间件优先级：Header > Session > 重定向登录
+
+#### 参考项目
+
+- [apps-scheduler](https://github.com/lazycat-contrib/apps-scheduler) - 应用管理 API 使用示例（Echo 框架）
+- [cat-led](https://github.com/lazycat-contrib/cat-led) - 设备管理 API 使用示例（Gin 框架）
 
 ### 裸应用 
 
