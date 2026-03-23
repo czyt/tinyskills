@@ -1,6 +1,6 @@
 ---
 name: lazycat-app-publisher
-description: LazyCat v1.4.1+ app publisher with intelligent Docker Compose conversion, smart dependency analysis, auto-generated credentials, compose_override support, advanced routing (upstreams/ingress), file handlers, hardware acceleration, and complete publishing workflow.
+description: LazyCat v1.4.1+ app publisher with intelligent Docker Compose conversion, smart dependency analysis, auto-generated credentials, compose_override support, advanced routing (upstreams/ingress), file handlers, hardware acceleration, and complete publishing workflow. Triggers when converting Docker Compose to LazyCat format, publishing apps to LazyCat store, creating LPK packages, or managing LazyCat application lifecycle.
 preferences:
   - id: add_root_to_public_path
     name: Add / to public_path
@@ -52,6 +52,33 @@ preferences:
 # LazyCat App Publisher
 
 This skill helps you convert Docker Compose files and Docker commands into LazyCat Cloud application configurations with **intelligent dependency analysis** and **automatic configuration optimization** for seamless app publishing.
+
+## 📚 Reference Documents
+
+For detailed information on specific topics, see:
+
+| Document | Content |
+|----------|---------|
+| [references/version-features.md](references/version-features.md) | **OS版本与特性对照表** - 各版本支持的功能和 min_os_version 设置 |
+| [references/dev-workflow.md](references/dev-workflow.md) | Frontend/backend development workflow, build configs, release process |
+| [references/injects.md](references/injects.md) | Script injection (injects) mechanism, ctx API, request inject patterns |
+| [references/cli-reference.md](references/cli-reference.md) | Complete lzc-cli command reference |
+| [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md) | compose_override, resources, networking, file handlers |
+| [MANIFEST_REFERENCE.md](MANIFEST_REFERENCE.md) | Complete manifest format specification |
+
+## 📋 OS Version Requirements
+
+**推荐设置 `min_os_version: 1.3.8`** - 这是现代应用的推荐最低版本。
+
+| Feature | Minimum Version |
+|---------|----------------|
+| `services.[].healthcheck` | v1.4.1 |
+| `compose_override` | v1.3.0 |
+| `application.upstreams` | v1.3.8 |
+| `services.[].mem_limit`, `shm_size` | v1.3.8 |
+| `/lzcapp/documents` (新路径) | v1.5.0 |
+
+详见 [references/version-features.md](references/version-features.md)
 
 ## 🎯 Key Features
 
@@ -554,6 +581,116 @@ def should_set_background_task(services, user_preference=False):
 | Error Rate | 30% | 5% | 83% ↓ |
 | User Satisfaction | 65% | 95% | 46% ↑ |
 
+## 🔧 Development Workflow
+
+### Quick Decision Table
+
+| Your Goal | Use This |
+|-----------|----------|
+| Change UI with hot reload | `project deploy` + `npm run dev` |
+| Change backend code | `project deploy` + `project sync --watch` + `project exec` |
+| Build package for others | `project release` |
+
+### Build Config Layers
+
+```yaml
+# lzc-build.yml - Release config
+manifest: ./lzc-manifest.yml
+pkgout: ./
+icon: ./icon.png
+
+# lzc-build.dev.yml - Dev override (optional)
+pkg_id: org.example.todo.dev
+envs:
+  - DEV_MODE=1
+```
+
+### Manifest Build Preprocessing
+
+Use `#@build` directives for dev/release conditional content:
+
+```yaml
+application:
+  routes:
+    - /=file:///lzcapp/pkg/content/dist
+#@build if env.DEV_MODE=1
+  injects:
+    - id: dev-proxy
+      on: request
+      when: ["/*"]
+      do: |
+        // dev-only code here
+#@build end
+```
+
+**Key directives:**
+- `#@build if env.DEV_MODE=1` - Conditional block
+- `#@build else` - Else branch
+- `#@build end` - Close block
+- `#@build include ./path.yml` - Include file
+
+### Frontend Development
+
+```bash
+# 1. Deploy
+lzc-cli project deploy
+
+# 2. Open app to see dev guide
+
+# 3. Start dev server
+npm run dev
+
+# 4. Refresh page
+```
+
+### Backend Development
+
+```bash
+# 1. Deploy
+lzc-cli project deploy
+
+# 2. Start sync
+lzc-cli project sync --watch
+
+# 3. Enter container
+lzc-cli project exec /bin/sh
+
+# 4. Start backend manually
+/app/run.sh
+```
+
+---
+
+## 📝 Project File Structure
+
+### Recommended Layout
+
+```
+myapp/
+├── lzc-build.yml          # Release build config
+├── lzc-build.dev.yml      # Dev override (optional)
+├── lzc-manifest.yml       # App runtime config
+├── package.yml            # Static package metadata
+├── icon.png               # 512x512 PNG icon
+└── src/                   # Source code
+```
+
+### package.yml (Static Metadata)
+
+```yaml
+package: org.example.myapp
+version: 1.0.0
+name: My Application
+description: Application description
+author: Developer Name
+license: MIT
+homepage: https://example.com
+```
+
+**Note:** Static metadata now goes in `package.yml`, not at top level of `lzc-manifest.yml`.
+
+---
+
 ## ⚡ Quick Start
 
 ### Basic Usage
@@ -838,6 +975,74 @@ services:
         - redis-cli ping
       interval: 30s
 ```
+
+## 🔧 Script Injection (injects) Quick Reference
+
+`injects` allows you to inject scripts into browser, request, or response phases.
+
+### Phases
+
+| Phase | Runtime | Use Case |
+|-------|---------|----------|
+| `on=browser` | Browser | DOM manipulation, autofill |
+| `on=request` | lzcinit | Header injection, routing |
+| `on=response` | lzcinit | CORS/CSP modification |
+
+### Common Pattern: Dev Mode Proxy
+
+```yaml
+application:
+  routes:
+    - /=file:///lzcapp/pkg/content/dist
+#@build if env.DEV_MODE=1
+  injects:
+    - id: dev-proxy
+      on: request
+      auth_required: false
+      when:
+        - "/*"
+      do:
+        - src: |
+            const devPort = 3000;
+            if (!ctx.dev.id) {
+              ctx.response.send(200, "Dev machine not linked", { content_type: "text/html" });
+              return;
+            }
+            if (!ctx.net.reachable("tcp", "127.0.0.1", devPort, ctx.net.via.client(ctx.dev.id))) {
+              ctx.response.send(200, "Dev server not ready on port " + devPort, { content_type: "text/html" });
+              return;
+            }
+            ctx.proxy.to("http://127.0.0.1:" + devPort, {
+              via: ctx.net.via.client(ctx.dev.id),
+              use_target_host: true,
+            });
+#@build end
+```
+
+### Key ctx Methods
+
+```javascript
+// Response
+ctx.response.send(status, body, options)
+
+// Proxy
+ctx.proxy.to(url, options)
+
+// Headers
+ctx.headers.set(key, value)
+ctx.headers.del(key)
+
+// Dev machine
+ctx.dev.id           // Dev machine ID
+ctx.dev.online()     // Is dev machine online
+
+// Network
+ctx.net.via.client(id)    // Via client tunnel
+ctx.net.via.host()        // Via host network
+ctx.net.reachable(protocol, host, port, via)  // Check connectivity
+```
+
+---
 
 ## 🔍 App Store Existence Check (Automatic)
 
@@ -2648,6 +2853,56 @@ myapp/
 ---
 
 ## 🚀 Quick Start Commands
+
+### Create Project from Template
+
+```bash
+# Create from template
+lzc-cli project create myapp -t hello-vue
+
+# Available templates:
+# - hello-vue        : Vue.js frontend
+# - todolist-golang  : Go backend with Todo API
+# - springboot       : Java Spring Boot
+# - python           : Python backend
+# - node             : Node.js backend
+```
+
+### Development Commands
+
+```bash
+# Deploy (uses lzc-build.dev.yml if exists)
+lzc-cli project deploy
+
+# View project info
+lzc-cli project info
+
+# Sync code to container (watch mode)
+lzc-cli project sync --watch
+
+# Enter container shell
+lzc-cli project exec /bin/sh
+
+# View logs
+lzc-cli project log -f
+```
+
+### Release Commands
+
+```bash
+# Build release package
+lzc-cli project release -o app.lpk
+
+# Inspect package
+lzc-cli lpk info app.lpk
+
+# Copy image to LazyCat registry
+lzc-cli appstore copy-image myapp:latest
+
+# Publish to app store
+lzc-cli appstore login
+lzc-cli appstore publish app.lpk
+```
 
 ### Local Testing
 ```bash
