@@ -241,20 +241,16 @@ services:
 # ✅ Only truly necessary parameters
 params:
   - id: jwt_secret_key
-    type: string
+    type: secret
     name: "JWT secret key"
-    description: "Secret key for JWT token generation"
+    description: "Secret key for JWT token generation, use at least 32 characters"
     optional: false
-    regex: "^.{32,}$"
-    regex_message: "Minimum 32 characters required"
 
   - id: admin_password
-    type: string
+    type: secret
     name: "admin password"
-    description: "Administrator password"
+    description: "Administrator password, use at least 8 characters"
     optional: false
-    regex: "^.{8,}$"
-    regex_message: "Minimum 8 characters required"
 
   - id: log_level
     type: string
@@ -350,11 +346,10 @@ services:
 # lzc-deploy-params.yml
 params:
   - id: secret_key
-    type: string
+    type: secret
     name: "secret key"
-    description: "Application secret key"
+    description: "Application secret key, use at least 32 characters"
     optional: false
-    regex: "^.{32,}$"
 ```
 
 ### Example 2: Multi-Service Stack

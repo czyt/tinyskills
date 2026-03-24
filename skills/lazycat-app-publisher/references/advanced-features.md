@@ -1085,20 +1085,16 @@ locales:
 # lzc-deploy-params.yml
 params:
   - id: jwt_secret
-    type: string
+    type: secret
     name: "JWT secret key"
     description: "Secret key for authentication (min 32 chars)"
     optional: false
-    regex: "^.{32,}$"
-    regex_message: "Minimum 32 characters required"
 
   - id: admin_password
-    type: string
+    type: secret
     name: "admin password"
-    description: "Administrator password"
+    description: "Administrator password (min 8 chars)"
     optional: false
-    regex: "^.{8,}$"
-    regex_message: "Minimum 8 characters required"
 
   - id: gpu_enabled
     type: bool
@@ -1108,13 +1104,11 @@ params:
     optional: true
 
   - id: max_concurrent
-    type: number
+    type: string
     name: "max concurrent jobs"
-    description: "Maximum number of concurrent image generation jobs"
-    default_value: 2
+    description: "Maximum number of concurrent image generation jobs, recommended range 1-10"
+    default_value: "2"
     optional: true
-    min: 1
-    max: 10
 
 locales:
   zh:
@@ -1197,7 +1191,8 @@ compose_override:
   - [ ] `params.name/description` 使用英文
   - [ ] `locales` 提供中文翻译
   - [ ] 必填参数设置 `optional: false`
-  - [ ] 敏感参数设置 `regex` 验证
+  - [ ] 敏感参数优先使用 `secret`
+  - [ ] 不要生成 `placeholder`、`regex`、`regex_message`、`min`、`max`
 
 ---
 

@@ -148,6 +148,16 @@ def classify_service(service_config):
 
 详见 [references/intelligent-analysis.md](references/intelligent-analysis.md)
 
+### Setup Wizard Constraints
+
+生成 `lzc-deploy-params.yml` 时，严格按官方 `deploy-params` 规范输出：
+
+- 仅使用字段：`id`、`type`、`name`、`description`、`optional`、`default_value`、`hidden`
+- 仅使用类型：`bool`、`lzc_uid`、`string`、`secret`
+- 不要生成 `placeholder`、`regex`、`regex_message`、`min`、`max`
+- 不要生成 `type: number`
+- 需要约束输入格式时，在 `description` 中说明；敏感值优先使用 `secret`
+
 ---
 
 ## Docker → LazyCat Mapping

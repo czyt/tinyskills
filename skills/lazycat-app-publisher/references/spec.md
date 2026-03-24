@@ -283,71 +283,64 @@ locales:
 
 | 类型 | 描述 | 示例 |
 |------|------|------|
-| `string` | 字符串 | API Token, 密码 |
+| `string` | 字符串 | 域名, 应用名称, 日志级别 |
+| `secret` | 敏感字符串 | API Token, 密码, JWT Secret |
 | `bool` | 布尔值 | 启用/禁用功能 |
-| `number` | 数字 | 端口号, 间隔时间 |
+| `lzc_uid` | LazyCat 用户 ID | 绑定盒子用户 |
 
 ### 字段说明
 
 | 字段名 | 类型 | 描述 |
 |--------|------|------|
 | `id` | `string` | 参数 ID（推荐使用小写英文+下划线） |
-| `type` | `string` | 参数类型：string, bool, number |
+| `type` | `string` | 参数类型：`bool`、`lzc_uid`、`string`、`secret` |
 | `name` | `string` | 参数名称（英文） |
 | `description` | `string` | 参数描述（英文） |
-| `default_value` | `any` | 默认值 |
+| `default_value` | `string` | 默认值，支持 `$random(len=5)` |
 | `optional` | `bool` | 是否可选 |
-| `placeholder` | `string` | 输入框占位符 |
-| `regex` | `string` | 正则表达式验证 |
-| `regex_message` | `string` | 验证失败提示信息 |
-| `min` | `number` | 最小值（number 类型） |
-| `max` | `number` | 最大值（number 类型） |
+| `hidden` | `bool` | 字段生效但不在界面中渲染 |
 
 **⚠️ 关键规则：**
 - `params.id`: 推荐使用**小写英文+下划线**（如 `yuque_token`, `enable_auto_sync`）
 - `params.name/description`: 必须是英文
 - `locales`: 提供多语言翻译，key 必须匹配 params.id
+- 不要生成 `placeholder`、`regex`、`regex_message`、`min`、`max`
+- 不要生成 `type: number`
 
 **示例：**
 
 ```yaml
 params:
-  - id: yuque_token
+  - id: workspace_name
     type: string
-    name: "yuque token"
-    description: "API Token for Yuque"
-    default_value: ""
+    name: "workspace name"
+    description: "Workspace name shown in the application"
+    default_value: "my-workspace"
     optional: false
-    regex: "^[A-Za-z0-9_-]+$"
-    regex_message: "Only letters, numbers, underscore and dash allowed"
 
-  - id: enable_auto_sync
-    type: bool
-    name: "enable auto sync"
-    description: "Enable automatic synchronization"
-    default_value: true
+  - id: yuque_token
+    type: secret
+    name: "yuque token"
+    description: "API token for Yuque"
     optional: true
 
-  - id: sync_interval
-    type: number
-    name: "sync interval"
-    description: "Sync interval in minutes"
-    default_value: 60
-    optional: true
-    min: 1
-    max: 1440
+  - id: owner_uid
+    type: lzc_uid
+    name: "owner user"
+    description: "LazyCat user who will own the workspace"
+    optional: false
 
 locales:
   zh:
+    workspace_name:
+      name: "工作区名称"
+      description: "应用中展示的工作区名称"
     yuque_token:
       name: "语雀 Token"
       description: "语雀 API Token"
-    enable_auto_sync:
-      name: "启用自动同步"
-      description: "是否启用自动同步功能"
-    sync_interval:
-      name: "同步间隔"
-      description: "同步间隔时间（分钟）"
+    owner_uid:
+      name: "所属用户"
+      description: "绑定到该工作区的 LazyCat 用户"
 ```
 
 ---

@@ -370,7 +370,8 @@ services:
 
 **特性：**
 - ✅ 用户在安装向导中填写
-- ✅ 支持验证规则（regex, min/max）
+- ✅ 支持 `default_value` 和 `hidden`
+- ✅ 敏感值可使用 `secret` 类型
 - ✅ 可设置默认值
 
 ### 3. 运行时环境变量 (${LAZYCAT_*})
