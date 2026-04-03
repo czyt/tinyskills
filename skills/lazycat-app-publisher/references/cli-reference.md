@@ -2,12 +2,20 @@
 
 ## Environment Setup
 
-### Install lzc-cli
+### Install lzc-cli (v2.0.0+ for LPK v2)
 
 ```bash
+# Install v2 (recommended for LPK v2)
+npm install -g @lazycatcloud/lzc-cli@2.0.0
+
+# Or install latest
 npm install -g @lazycatcloud/lzc-cli
+
+# Verify version
 lzc-cli --version
 ```
+
+**Note:** LPK v2 format requires lzc-cli v2.0.0+.
 
 ### Prepare SSH Key
 
@@ -134,12 +142,17 @@ lzc-cli project log --tail 100
 ### Build Release Package
 
 ```bash
-# Build LPK package
+# Build LPK v2 package (default with lzc-cli v2.0.0+)
 lzc-cli project release -o release.lpk
 
 # Or use build command
 lzc-cli project build -o release.lpk
 ```
+
+**LPK v2 Format:**
+- Tar-based (not zip)
+- Requires `package.yml`
+- Supports embedded images via `images/`
 
 ---
 
@@ -152,9 +165,21 @@ lzc-cli project build -o release.lpk
 lzc-cli lpk info release.lpk
 
 # Output includes:
-# - format (tar/zip)
+# - format (tar for LPK v2, zip for LPK v1)
 # - package
 # - version
+# - content files
+```
+
+**LPK v2 Output Example:**
+```
+format: tar
+package: cloud.lazycat.app.myapp
+version: 1.0.0
+files:
+  - manifest.yml
+  - package.yml
+  - content.tar.gz
 ```
 
 ### Install LPK

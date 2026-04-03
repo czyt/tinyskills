@@ -2,6 +2,32 @@
 
 This reference covers the development workflow for LazyCat applications, including frontend/backend development, build configuration, and release process.
 
+## Environment Requirements
+
+### LPK v2 (Default, Recommended)
+
+**Requirements:**
+- lzcos v1.5.0+
+- lzc-cli v2.0.0+ (`npm install -g @lazycatcloud/lzc-cli@2.0.0`)
+
+**Key Features:**
+- Tar-based format (replaces zip)
+- Separate `package.yml` for static metadata
+- Support for embedded images via `images/`
+- New `lzc-cli project` workflow commands
+
+### Install lzc-cli
+
+```bash
+# Install latest v2
+npm install -g @lazycatcloud/lzc-cli@2.0.0
+
+# Verify version
+lzc-cli --version
+```
+
+---
+
 ## Core Decision Table
 
 | Your Goal | Use This | Do Not Start With |
@@ -166,19 +192,37 @@ application:
 ### Clean Release Package Requirements
 
 1. Uses `lzc-build.yml`
-2. No dev-only `pkg_id` override
-3. No dev-only `#@build` branches
-4. Image contains only final artifacts
-5. Works without dev machine online
+2. Has `package.yml` with valid static metadata
+3. No dev-only `pkg_id` override
+4. No dev-only `#@build` branches
+5. Image contains only final artifacts
+6. Works without dev machine online
 
 ### Release Command
 
 ```bash
+# Build LPK v2 package (default with lzc-cli v2.0.0+)
 lzc-cli project release -o app.lpk
+
+# Check LPK info
+lzc-cli lpk info app.lpk
+```
+
+### LPK v2 Verification
+
+```bash
+# Check format
+lzc-cli lpk info app.lpk
+
+# Output should show:
+# - format: tar (LPK v2)
+# - package: your.package.id
+# - version: x.x.x
 ```
 
 ### Verification Checklist
 
+- [ ] `package.yml` exists with required fields (`package`, `version`)
 - [ ] Package name does not contain `.dev` suffix
 - [ ] Packaged manifest has no dev-only inject blocks
 - [ ] Release image not built from `Dockerfile.dev`
@@ -188,21 +232,21 @@ lzc-cli project release -o app.lpk
 
 ## File Structure
 
-### Recommended Project Layout
+### Recommended Project Layout (LPK v2)
 
 ```
 myapp/
 ├── lzc-build.yml          # Release build config
 ├── lzc-build.dev.yml      # Dev override (optional)
+├── package.yml            # Static package metadata (LPK v2 REQUIRED)
 ├── lzc-manifest.yml       # App runtime config
-├── package.yml            # Static package metadata
 ├── icon.png               # 512x512 PNG icon
 ├── src/                   # Source code
 ├── dist/                  # Build output (for contentdir)
 └── Dockerfile             # For embedded images (optional)
 ```
 
-### package.yml (Static Metadata)
+### package.yml (Static Metadata, LPK v2 Required)
 
 ```yaml
 package: org.example.myapp
@@ -212,7 +256,21 @@ description: A sample application
 author: Developer Name
 license: MIT
 homepage: https://example.com
+min_os_version: 1.3.8
+
+locales:
+  zh-CN:
+    name: "我的应用"
+    description: "示例应用"
+
+permissions:
+  required:
+    - net.internet
+  optional:
+    - document.read
 ```
+
+**Important:** `package.yml` is required for LPK v2 format. Static fields like `package`, `version`, `name` must be here, not in `lzc-manifest.yml`.
 
 ### lzc-manifest.yml (Runtime Config)
 

@@ -24,9 +24,11 @@
 
 说明：
 
-1. `LPK v2` / `package.yml` 新流程以 `lzcos v1.5.0+` 为前提，构建需配合 `lzc-cli v2.0.0+`。
-2. 自 `LPK v2` 起，静态包元数据统一放入 `package.yml`，包括 `package`、`version`、`name`、`description`、`locales`、`author`、`license`、`homepage`、`min_os_version`、`unsupported_platforms` 与 `admin_only`。
-3. `LPK v1` 仍兼容旧布局，允许这些静态字段继续保留在 `lzc-manifest.yml` 顶层。
+1. **`LPK v2`** / `package.yml` 新流程以 `lzcos v1.5.0+` 为前提，构建需配合 `lzc-cli v2.0.0+`。
+2. 自 `LPK v2` 起，静态包元数据统一放入 `package.yml`，包括 `package`、`version`、`name`、`description`、`locales`、`author`、`license`、`homepage`、`min_os_version`、`unsupported_platforms`、`admin_only` 与 `permissions`。
+3. `lzc-manifest.yml` 只保留运行结构字段：`application`、`services`、`ext_config`、`usage`。
+4. `LPK v1` 仍兼容旧布局，允许这些静态字段继续保留在 `lzc-manifest.yml` 顶层。
+5. 对于需要访问用户文稿的应用，必须在 `ext_config` 中声明 `enable_document_access: true`（v1.5.0+）。
 
 ## 二、顶层数据结构 `ManifestConfig`
 
@@ -142,10 +144,27 @@ application:
 
 | 字段名 | 类型 | 描述 |
 | ---- | ---- | ---- |
-| `enable_document_access` | `bool` | 如果为 true 则挂载用户文稿目录到 `/lzcapp/documents` |
+| `enable_document_access` | `bool` | 如果为 true 则挂载用户文稿目录到 `/lzcapp/documents`（v1.5.0+） |
 | `enable_media_access` | `bool` | 如果为 true 则将 media 目录挂载到 `/lzcapp/media` |
 | `disable_grpc_web_on_root` | `bool` | 如果为 true 则不再劫持应用的 grpc-web 流量 |
 | `default_prefix_domain` | `string` | 会调整启动器中点击应用后打开的最终域名，可以写任何不含 `.` 的字符串 |
+
+**说明：**
+
+1. `enable_document_access` 在 v1.5.0+ 中需要配合 `permissions` 中的 `document.read` 或 `document.write` 使用
+2. 旧路径 `/lzcapp/document` 已废弃，新代码请使用 `/lzcapp/documents`（复数形式）
+
+**示例：**
+
+```yaml
+ext_config:
+  enable_document_access: true
+
+services:
+  app:
+    binds:
+      - /lzcapp/documents:/app/data/documents
+```
 
 ---
 
@@ -274,7 +293,7 @@ locales:
 
 ## package.yml 规范
 
-`package.yml` 用于定义 LPK 的静态包元数据。
+`package.yml` 用于定义 LPK 的静态包元数据，以及开发者声明的权限需求范围。
 
 **前提：**
 
@@ -297,6 +316,31 @@ locales:
 | `min_os_version` | `string` | 可选；要求的最低系统版本 |
 | `unsupported_platforms` | `[]string` | 可选；不支持的平台列表 |
 | `locales` | `map[string]PackageLocaleConfig` | 可选；多语言元数据 |
+| `permissions` | `PermissionsConfig` | 可选；声明应用需要的权限（v1.5.0+） |
+
+### Permissions 配置
+
+| 字段名 | 类型 | 描述 |
+|--------|------|------|
+| `required` | `[]string` | 应用正常运行必需的权限 id 列表 |
+| `optional` | `[]string` | 应用可选使用的权限 id 列表 |
+
+**可用权限 id：**
+
+| 权限 id | 名称 | 描述 |
+|---------|------|------|
+| `net.internet` | 访问互联网 | 允许应用访问公网网络资源 |
+| `net.lan` | 访问局域网 | 允许应用访问当前局域网内的设备与服务 |
+| `net.host` | 使用宿主网络 | 允许应用使用宿主网络 |
+| `document.private` | 私有文稿 | 允许应用使用 `/lzcapp/documents/$uid` 私有文稿目录 |
+| `document.read` | 读取文稿 | 允许应用读取用户文稿目录中的内容 |
+| `document.write` | 写入文稿 | 允许应用修改或写入用户文稿目录中的内容 |
+| `media.read` | 读取媒体 | 允许应用读取系统媒体目录中的内容 |
+| `media.write` | 写入媒体 | 允许应用修改或写入系统媒体目录中的内容 |
+| `device.dri.render` | 访问 DRI Render | 允许应用访问 DRI render 设备 |
+| `device.usb` | 访问 USB 设备 | 允许应用访问连接到微服的 USB 设备 |
+| `device.kvm` | 访问 KVM 设备 | 允许应用访问 KVM 相关设备 |
+| `compose.override` | 高危运行时覆盖 | 允许应用通过 Compose Override 覆盖最终运行时配置 |
 
 **示例：**
 
@@ -313,6 +357,14 @@ locales:
   zh-CN:
     name: "示例应用"
     description: "示例应用描述"
+
+permissions:
+  required:
+    - net.internet
+    - document.read
+  optional:
+    - document.write
+    - device.dri.render
 ```
 
 ---
@@ -395,6 +447,14 @@ locales:
 
 构建配置文件用于定义如何构建 LazyCat 应用包（.lpk）。
 
+### LPK v2 格式（默认，推荐）
+
+**要求：**
+- lzcos v1.5.0+
+- lzc-cli v2.0.0+ (`npm install -g @lazycatcloud/lzc-cli@2.0.0`)
+
+**输出：** Tar 格式的 LPK v2，包含 `package.yml`、`manifest.yml`、可选的 `content.tar.gz`、可选的 `images/` 和 `images.lock`。
+
 ### 字段说明
 
 | 字段名 | 类型 | 描述 |
@@ -409,6 +469,17 @@ locales:
 | `images` | `map[string]ImageBuildConfig` | 可选；`LPK v2` 下用于产出 `embed:<alias>` 镜像引用 |
 | `compose_override` | `map` | 覆盖不支持的 Docker Compose 参数（可选） |
 
+### Images 配置 (LPK v2)
+
+用于在打包阶段通过 Dockerfile 构建镜像，并生成 LPK v2 所需的 `images/` 与 `images.lock`。
+
+| 字段名 | 类型 | 描述 |
+|--------|------|------|
+| `dockerfile` | `string` | Dockerfile 文件路径，与 `dockerfile-content` 二选一 |
+| `dockerfile-content` | `string` | Dockerfile 内容，与 `dockerfile` 二选一 |
+| `context` | `string` | 构建上下文目录 |
+| `upstream-match` | `string` | 按前缀匹配上游镜像，默认 `registry.lazycat.cloud` |
+
 **示例：**
 
 ```yaml
@@ -416,7 +487,49 @@ locales:
 manifest: ./lzc-manifest.yml
 pkgout: ./
 icon: ./icon.png
+
+# 可选：内嵌镜像构建
+images:
+  app-runtime:
+    dockerfile: ./Dockerfile
+    context: .
+```
+
+在 `lzc-manifest.yml` 中引用：
+```yaml
+services:
+  app:
+    image: embed:app-runtime
+```
+
+### 文件组织约定
+
+推荐项目结构（LPK v2）：
+```
+.
+├── lzc-build.yml          # 默认构建配置（release）
+├── lzc-build.dev.yml      # 开发态覆盖配置（可选）
+├── package.yml            # 静态包元数据（LPK v2 必需）
+├── lzc-manifest.yml       # 应用运行结构定义
+├── icon.png               # 应用图标（512x512 PNG）
+├── Dockerfile             # 内嵌镜像构建（可选）
+└── content/               # 额外内容目录（可选）
+```
+
+**示例：**
+
+```yaml
+# lzc-build.yml
+manifest: ./lzc-manifest.yml
+pkgout: ./
+icon: ./icon.png
+
+# 可选：开发态覆盖
+# lzc-build.dev.yml
 pkg_id: cloud.lazycat.app.demo-app.dev
+contentdir:
+envs:
+  - DEV_MODE=1
 
 # 可选：覆盖不支持的参数
 compose_override:

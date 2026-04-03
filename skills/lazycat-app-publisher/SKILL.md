@@ -1,6 +1,6 @@
 ---
 name: lazycat-app-publisher
-description: LazyCat v1.4.1+ app publisher with intelligent Docker Compose conversion, smart dependency analysis, auto-generated credentials, compose_override support, advanced routing (upstreams/ingress), file handlers, hardware acceleration, and complete publishing workflow. Triggers when converting Docker Compose to LazyCat format, publishing apps to LazyCat store, creating LPK packages, or managing LazyCat application lifecycle.
+description: LazyCat v1.5.0+ app publisher with intelligent Docker Compose conversion, smart dependency analysis, auto-generated credentials, compose_override support, advanced routing (upstreams/ingress), file handlers, hardware acceleration, and complete publishing workflow. Default LPK v2 format with package.yml + lzc-manifest.yml separation. Triggers when converting Docker Compose to LazyCat format, publishing apps to LazyCat store, creating LPK packages, or managing LazyCat application lifecycle.
 preferences:
   - id: add_root_to_public_path
     name: Add / to public_path
@@ -85,6 +85,8 @@ This skill helps you convert Docker Compose files and Docker commands into LazyC
 | `application.upstreams` | v1.3.8 |
 | `services.[].mem_limit`, `shm_size` | v1.3.8 |
 | `/lzcapp/documents` (新路径) | v1.5.0 |
+| LPK v2 / `package.yml` | v1.5.0 |
+| `lzc-cli project` workflow | lzc-cli v2.0.0+ |
 
 详见 [references/version-features.md](references/version-features.md)
 
@@ -160,14 +162,28 @@ def classify_service(service_config):
 
 ### Package Layout Constraints
 
-生成应用文件时，按目标系统版本区分：
+生成应用文件时，**默认使用 LPK v2 格式**（推荐 lzcos v1.5.0+ 配合 lzc-cli v2.0.0+）：
 
-- 若目标是 `lzcos v1.5.0+` 且使用 `LPK v2` / `lzc-cli v2.0.0+`，推荐使用 `package.yml + lzc-manifest.yml`
-- 此时 `package.yml` 负责静态包元数据：`package`、`version`、`name`、`description`、`locales`、`author`、`license`、`homepage`、`min_os_version`、`unsupported_platforms`、`admin_only`
-- 此时 `lzc-manifest.yml` 只保留运行结构字段：`application`、`services`、`ext_config`、`usage`
-- 若目标低于 `lzcos v1.5.0` 或仍使用 `LPK v1`，继续兼容把静态元数据写在 `lzc-manifest.yml` 顶层
-- 若生成 `admin_only: true`，不要同时生成非空 `application.public_path`
-- `lzc-build.yml` 可按需使用 `pkg_id`、`pkg_name` 覆盖最终打包的包名和显示名
+**LPK v2 默认布局（推荐）**：
+- 必须包含 `package.yml` - 静态包元数据：`package`、`version`、`name`、`description`、`locales`、`author`、`license`、`homepage`、`min_os_version`、`unsupported_platforms`、`admin_only`、`permissions`
+- `lzc-manifest.yml` 只保留运行结构字段：`application`、`services`、`ext_config`、`usage`
+- `lzc-build.yml` 支持 `pkg_id`、`pkg_name` 覆盖最终打包值
+- 可选 `images/` 和 `images.lock` 用于内嵌镜像分发
+
+**文件组织**：
+```
+.
+├── lzc-build.yml          # 构建配置
+├── lzc-build.dev.yml      # 开发态覆盖（可选）
+├── package.yml            # 静态包元数据（LPK v2 必需）
+├── lzc-manifest.yml       # 运行结构定义
+└── icon.png               # 应用图标
+```
+
+**兼容性说明**：
+- LPK v2 (tar 格式) 是 1.5.0+ 的默认格式，需要 `package.yml`
+- LPK v1 (zip 格式) 仍兼容旧布局，但新项目应使用 v2
+- 若目标系统低于 lzcos v1.5.0，可考虑继续使用 v1 格式
 
 ---
 
@@ -188,28 +204,58 @@ def classify_service(service_config):
 - **Docker**: `/some/path:/container/path`
 - **LazyCat**: `/lzcapp/var/...:/container/path` 或 `/lzcapp/cache/...:/container/path`
 
+**文档路径变更（v1.5.0+）**：
+
+| 版本 | 路径 | 说明 |
+|------|------|------|
+| v1.5.0+ | `/lzcapp/documents` | 新路径，推荐 |
+| < v1.5.0 | `/lzcapp/document` | 废弃，仅兼容 |
+
+需要文档访问权限时，需在 manifest 中声明：
+```yaml
+ext_config:
+  enable_document_access: true
+```
+
 详见 [references/quick-reference.md](references/quick-reference.md)
 
 ---
 
 ## Best Practices
 
-### ✅ Do - Complete Package + Runtime Structure (LPK v2 / lzcos v1.5.0+)
+### ✅ Do - LPK v2 完整示例（推荐，lzcos v1.5.0+）
 
 ```yaml
-# package.yml
+# package.yml - 静态元数据
 package: cloud.lazycat.app.myapp
 version: 1.0.0
 name: MyApp
 description: "My application"
 min_os_version: 1.3.8
+author: "Developer"
+license: MIT
+homepage: https://example.com
+
+locales:
+  zh:
+    name: "我的应用"
+    description: "我的应用描述"
+  en:
+    name: "My App"
+    description: "My application"
+
+permissions:
+  required:
+    - net.internet
+  optional:
+    - document.read
 ```
 
 ```yaml
-# lzc-manifest.yml
+# lzc-manifest.yml - 运行结构
 application:
   subdomain: myapp
-  upstreams:  # ✅ Recommended over routes
+  upstreams:  # ✅ 推荐使用 upstreams 替代 routes
     - location: /
       backend: http://myapp:8080/
 
@@ -218,7 +264,7 @@ services:
     image: postgres:15
     environment:
       - POSTGRES_PASSWORD={{.INTERNAL.db_password}}
-    healthcheck:  # ✅ v1.4.1: Use 'healthcheck' (no underscore)
+    healthcheck:  # ✅ v1.4.1: 使用 'healthcheck' (无下划线)
       test:
         - CMD-SHELL
         - pg_isready -U postgres
@@ -228,47 +274,61 @@ services:
       start_period: 30s
     binds:
       - /lzcapp/var/db:/var/lib/postgresql/data
-
-locales:
-  zh:
-    name: "我的应用"
 ```
 
 ### ❌ Avoid - Common Mistakes
 
 ```yaml
-# ❌ Putting static package metadata in lzc-manifest.yml
+# ❌ 将静态包元数据放在 lzc-manifest.yml（LPK v2 不允许）
+# 这些字段应该移到 package.yml
 package: cloud.lazycat.app.myapp
 version: 1.0.0
 name: MyApp
 
-# ❌ Old format with lzc-sdk-version
-lzc-sdk-version: "0.1"  # Removed!
+# ❌ 旧格式 lzc-sdk-version
+lzc-sdk-version: "0.1"  # 已移除！
 
-# ❌ Using deprecated health_check for services
+# ❌ 对 services 使用废弃的 health_check
 services:
   postgres:
-    health_check:  # Deprecated! Use 'healthcheck'
+    health_check:  # 已废弃！使用 'healthcheck'
 
-# ❌ Using routes instead of upstreams
+# ❌ 使用 routes 而不是 upstreams
 application:
   routes:
-    - /=http://myapp:8080/  # Use upstreams instead
+    - /=http://myapp:8080/  # 使用 upstreams 替代
 
-# ❌ admin_only cannot be combined with non-empty public_path
+# ❌ admin_only 不能与非空 public_path 同时存在
 admin_only: true
 application:
   public_path:
     - /
 
-# ❌ Hardcoding secrets
+# ❌ 硬编码密钥
 environment:
-  - PASSWORD=secret123  # Use {{.U.password}} or {{.INTERNAL.xxx}}
+  - PASSWORD=secret123  # 使用 {{.U.password}} 或 {{.INTERNAL.xxx}}
+
+# ❌ v1.5.0+ 使用旧文档路径
+binds:
+  - /lzcapp/document:/data  # 使用 /lzcapp/documents
 ```
 
 ---
 
 ## Development Workflow
+
+### 环境要求
+
+**LPK v2 格式（默认，推荐）**：
+- lzcos v1.5.0+
+- lzc-cli v2.0.0+ (`npm install -g @lazycatcloud/lzc-cli@2.0.0`)
+
+**安装 CLI**：
+```bash
+npm install -g @lazycatcloud/lzc-cli
+# 或指定 v2 版本
+npm install -g @lazycatcloud/lzc-cli@2.0.0
+```
 
 ### Quick Decision Table
 
@@ -284,8 +344,11 @@ environment:
 # Create project from template
 lzc-cli project create myapp -t hello-vue
 
-# Deploy
+# Deploy (uses lzc-build.dev.yml if exists, else lzc-build.yml)
 lzc-cli project deploy
+
+# Deploy with release config
+lzc-cli project deploy --release
 
 # Sync code (watch mode)
 lzc-cli project sync --watch
@@ -293,8 +356,14 @@ lzc-cli project sync --watch
 # Enter container
 lzc-cli project exec /bin/sh
 
-# Build release package
+# View logs
+lzc-cli project log -f
+
+# Build release package (LPK v2 by default with lzc-cli v2.0.0+)
 lzc-cli project release -o app.lpk
+
+# Check LPK info
+lzc-cli lpk info app.lpk
 
 # Publish to store
 lzc-cli appstore publish app.lpk
@@ -304,7 +373,59 @@ lzc-cli appstore publish app.lpk
 
 ---
 
-## Script Injection (injects)
+## LPK v1 to v2 Migration
+
+### Using the Converter Script
+
+A Python script is provided to convert existing LPK v1 packages to v2 format:
+
+```bash
+# Basic usage
+python scripts/lpk_v1_to_v2.py app.lpk
+
+# Specify output
+python scripts/lpk_v1_to_v2.py app.lpk new-app.lpk
+
+# Output to directory
+python scripts/lpk_v1_to_v2.py app.lpk ./output/
+```
+
+**What the converter does:**
+1. Extracts LPK v1 (zip format)
+2. Splits `manifest.yml` into:
+   - `package.yml` - static metadata (package, version, name, description, etc.)
+   - `manifest.yml` - runtime structure (application, services, ext_config)
+3. Repackages as LPK v2 (tar format)
+
+**Requirements:**
+```bash
+pip install pyyaml
+```
+
+### Manual Migration
+
+For simple cases, you can manually migrate:
+
+```bash
+# 1. Extract v1
+unzip app.lpk -d temp/
+
+# 2. Create package.yml from manifest.yml static fields
+cat > package.yml << 'EOF'
+package: your.app.id
+version: 1.0.0
+name: Your App
+description: App description
+min_os_version: 1.3.8
+EOF
+
+# 3. Remove static fields from manifest.yml (keep only application, services, ext_config, usage)
+
+# 4. Repack as v2
+tar -cf app-v2.lpk package.yml manifest.yml content.tar.gz META/
+```
+
+---
 
 `injects` allows you to inject scripts into browser, request, or response phases.
 

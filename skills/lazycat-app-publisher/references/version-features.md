@@ -17,28 +17,105 @@ This document maps LazyCat OS versions to their features, helping you determine 
 | `api_auth_token` | v1.4.3 | For external API access |
 | `disable_trim_location` | v1.3.9 | Keep URL path in upstream |
 | `/lzcapp/documents` | v1.5.0 | Replaces `/lzcapp/document` |
+| **LPK v2 / `package.yml`** | **v1.5.0** | **New tar-based format, static metadata split** |
+| **lzc-cli v2.0.0+** | **v1.5.0** | **Required for LPK v2** |
 | Network isolation | v1.3.0 | Cross-app via `$service.$appid.lzcapp` |
+| `permissions` in package.yml | v1.5.0 | Declarative permission system |
+| `ext_config.enable_document_access` | v1.5.0 | Required for document access |
+
+---
+
+## LPK Format Versions
+
+### LPK v2 (Default, Recommended)
+
+**Requirements:**
+- lzcos v1.5.0+
+- lzc-cli v2.0.0+ (`npm install -g @lazycatcloud/lzc-cli@2.0.0`)
+
+**File Structure:**
+```
+app.lpk (tar format)
+├── manifest.yml          # Runtime structure only
+├── package.yml           # Static metadata (REQUIRED)
+├── content.tar.gz        # Optional content
+├── images/               # Embedded images (optional)
+├── images.lock           # Image lock file
+└── META/                 # Archive metadata
+```
+
+**Key Changes:**
+- Static metadata (`package`, `version`, `name`, etc.) moved to `package.yml`
+- `lzc-manifest.yml` contains only runtime structure
+- Tar-based format (was zip in v1)
+- Support for embedded images via `images/` and `images.lock`
+
+### LPK v1 (Legacy)
+
+**Compatible with:** All versions
+
+**File Structure:**
+```
+app.lpk (zip format)
+├── manifest.yml          # Contains both static and runtime data
+├── content.tar.gz        # Optional content
+└── META/                 # Archive metadata
+```
 
 ---
 
 ## Detailed Changelog
 
-### v1.5.0 (Unreleased)
+### v1.5.0 (Recommended)
+
+**New Features:**
+- **LPK v2 format**: Tar-based, requires `package.yml`, supports embedded images
+- **Declarative permissions**: `permissions` field in `package.yml`
+- **New document path**: `/lzcapp/documents` (plural)
+- **Document access control**: `ext_config.enable_document_access`
+- **lzc-cli v2.0.0+**: New `project` workflow commands
 
 **Compatibility Changes:**
 - `/lzcapp/document` and `/lzcapp/run/mnt/home` are deprecated
 - Document access root path is now `/lzcapp/documents`
-- Applications needing document access must set `ext_config.enable_document_access`
+- Applications needing document access must set `ext_config.enable_document_access: true`
+- Static metadata must be in `package.yml` (not `lzc-manifest.yml`)
 
-**Migration:**
+**Migration to LPK v2:**
+```yaml
+# Before (LPK v1) - lzc-manifest.yml
+package: cloud.lazycat.app.myapp
+version: 1.0.0
+name: MyApp
+description: "My app"
+application:
+  subdomain: myapp
+
+# After (LPK v2) - package.yml
+package: cloud.lazycat.app.myapp
+version: 1.0.0
+name: MyApp
+description: "My app"
+
+# After (LPK v2) - lzc-manifest.yml
+application:
+  subdomain: myapp
+```
+
+**Path Migration:**
 ```yaml
 # Before v1.5.0
 binds:
   - /lzcapp/document:/data/documents
 
 # After v1.5.0
-binds:
-  - /lzcapp/documents:/data/documents
+ext_config:
+  enable_document_access: true
+
+services:
+  app:
+    binds:
+      - /lzcapp/documents:/data/documents
 ```
 
 ### v1.4.3
