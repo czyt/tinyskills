@@ -12,3 +12,5 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-04-14T11:10	d4a4863	go-kratos	57.4	57.4	keep	边界条件覆盖	错误处理章节	dry_run
 2026-04-14T11:15	b606baf	go-kratos	57.4	58	keep	指令具体性+架构	删除重复+补充导入	dry_run
 2026-04-14T11:20	7a93697	go-kratos	58	60	keep	指令具体性	补充缺失导入	dry_run
+2026-04-14T12:00	4e87aa2	lazycat-sdk-dev	59	65	keep	整体架构	英文转中文风格	dry_run
+2026-04-14T12:05	2bb0659	lazycat-app-publisher	64	70	keep	整体架构	英文转中文风格	dry_run
