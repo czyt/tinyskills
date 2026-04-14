@@ -47,6 +47,11 @@ preferences:
     description: Generate compose_override section in lzc-build.yml for unsupported Docker Compose parameters
     type: boolean
     default: true
+  - id: passwordless_login
+    name: Passwordless Login Configuration
+    description: Automatically configure passwordless login for apps with password systems using injects
+    type: boolean
+    default: true
 ---
 
 # LazyCat App Publisher
@@ -57,6 +62,8 @@ This skill helps you convert Docker Compose files and Docker commands into LazyC
 
 | Document | Content |
 |----------|---------|
+| [references/strict-constraints.md](references/strict-constraints.md) | **严格约束 - 各配置文件允许/禁止字段** ⭐ |
+| [references/passwordless-login.md](references/passwordless-login.md) | **免密登录配置 - 所有应用必备** ⭐ |
 | [references/version-features.md](references/version-features.md) | OS版本与特性对照表 - min_os_version 设置 |
 | [references/quick-reference.md](references/quick-reference.md) | 快速参考 - 常用转换规则和命令 |
 | [references/healthcheck.md](references/healthcheck.md) | 健康检查配置 - v1.4.1+ 格式 |
@@ -76,19 +83,32 @@ This skill helps you convert Docker Compose files and Docker commands into LazyC
 
 ## OS Version Requirements
 
-**推荐设置 `min_os_version: 1.3.8`** - 这是现代应用的推荐最低版本。
+**⚠️ LPK v2 格式强制要求：`min_os_version: 1.5.0`**
 
-| Feature | Minimum Version |
-|---------|----------------|
-| `services.[].healthcheck` | v1.4.1 |
-| `compose_override` | v1.3.0 |
-| `application.upstreams` | v1.3.8 |
-| `services.[].mem_limit`, `shm_size` | v1.3.8 |
-| `/lzcapp/documents` (新路径) | v1.5.0 |
-| LPK v2 / `package.yml` | v1.5.0 |
-| `lzc-cli project` workflow | lzc-cli v2.0.0+ |
+LPK v2（tar 格式，包含 `package.yml`）是 lzcos v1.5.0+ 才支持的特性。如果使用 LPK v2 格式，必须设置 `min_os_version: 1.5.0` 或更高版本。
 
-详见 [references/version-features.md](references/version-features.md)
+| Feature | Minimum Version | Notes |
+|---------|----------------|-------|
+| **LPK v2 / `package.yml`** | **v1.5.0** | **强制要求！新项目默认使用** |
+| `/lzcapp/documents` (新路径) | v1.5.0 | 替代旧路径 `/lzcapp/document` |
+| `permissions` 声明 | v1.5.0 | 权限系统 |
+| `services.[].healthcheck` | v1.4.1 | 100% docker-compose compatible |
+| `compose_override` | v1.3.0 | For unsupported docker-compose params |
+| `application.upstreams` | v1.3.8 | Recommended over `routes` |
+| `services.[].mem_limit`, `shm_size` | v1.3.8 | Memory limits |
+| `lzc-cli project` workflow | lzc-cli v2.0.0+ | Required for LPK v2 |
+
+**版本决策表：**
+
+| 格式/特性 | 设置 min_os_version |
+|-----------|-------------------|
+| LPK v2 (tar, package.yml) | **1.5.0** (强制) |
+| LPK v1 (zip) | 无限制 |
+| 使用 `/lzcapp/documents` | 1.5.0 |
+| 使用 `permissions` | 1.5.0 |
+| 使用 `upstreams`, `mem_limit` | 1.3.8 |
+
+详见 [references/version-features.md](references/version-features.md) 和 [references/strict-constraints.md](references/strict-constraints.md)
 
 ---
 
@@ -152,25 +172,77 @@ def classify_service(service_config):
 
 ### Setup Wizard Constraints
 
-生成 `lzc-deploy-params.yml` 时，严格按官方 `deploy-params` 规范输出：
+生成 `lzc-deploy-params.yml` 时，**严格按照官方规范**：
 
-- 仅使用字段：`id`、`type`、`name`、`description`、`optional`、`default_value`、`hidden`
-- 仅使用类型：`bool`、`lzc_uid`、`string`、`secret`
-- 不要生成 `placeholder`、`regex`、`regex_message`、`min`、`max`
-- 不要生成 `type: number`
-- 需要约束输入格式时，在 `description` 中说明；敏感值优先使用 `secret`
+#### 允许的字段（完整列表）
+
+- ✅ `id` - 参数 ID（推荐小写英文+下划线）
+- ✅ `type` - 仅支持 `bool`、`lzc_uid`、`string`、`secret`
+- ✅ `name` - 参数名称（英文）
+- ✅ `description` - 参数描述（英文）
+- ✅ `optional` - 是否可选
+- ✅ `default_value` - 默认值，支持 `$random(len=5)`
+- ✅ `hidden` - 字段生效但不在界面中渲染
+
+#### ❌ 禁止使用的字段
+
+**以下字段不存在，禁止生成：**
+
+- ❌ `placeholder` - 不存在
+- ❌ `regex` - 不存在
+- ❌ `regex_message` - 不存在
+- ❌ `min` - 不存在
+- ❌ `max` - 不存在
+- ❌ `type: number` - 不支持
+- ❌ `type: integer` - 不支持
+- ❌ `type: email` - 不支持
+- ❌ `type: url` - 不支持
+- ❌ `required` - 应使用 `optional: false`
+- ❌ `value` - 应使用 `default_value`
+
+#### 约束输入的正确做法
+
+需要约束输入格式时，在 `description` 中说明：
+
+```yaml
+# ✅ 正确做法
+params:
+  - id: port_number
+    type: string  # 使用 string 类型
+    name: "Port Number"
+    description: "Service port number (1-65535, default 8080)"
+    default_value: "8080"
+```
+
+详见 [references/strict-constraints.md](references/strict-constraints.md)
 
 ### Package Layout Constraints
 
-生成应用文件时，**默认使用 LPK v2 格式**（推荐 lzcos v1.5.0+ 配合 lzc-cli v2.0.0+）：
+生成应用文件时，**默认使用 LPK v2 格式**（需要 lzcos v1.5.0+ 和 lzc-cli v2.0.0+）：
 
-**LPK v2 默认布局（推荐）**：
-- 必须包含 `package.yml` - 静态包元数据：`package`、`version`、`name`、`description`、`locales`、`author`、`license`、`homepage`、`min_os_version`、`unsupported_platforms`、`admin_only`、`permissions`
-- `lzc-manifest.yml` 只保留运行结构字段：`application`、`services`、`ext_config`、`usage`
-- `lzc-build.yml` 支持 `pkg_id`、`pkg_name` 覆盖最终打包值
-- 可选 `images/` 和 `images.lock` 用于内嵌镜像分发
+#### lzc-build.yml 允许的字段
 
-**文件组织**：
+- ✅ `manifest` - manifest.yml 文件路径（必需）
+- ✅ `pkgout` - LPK 输出路径（必需）
+- ✅ `icon` - 应用图标路径（必需，512x512 PNG）
+- ✅ `contentdir` - 内容目录（可选）
+- ✅ `pkg_id` - 覆盖 package.yml.package（可选）
+- ✅ `pkg_name` - 覆盖 package.yml.name（可选）
+- ✅ `envs` - 构建期变量（可选，`KEY=VALUE` 数组）
+- ✅ `buildscript` - 构建脚本（可选）
+- ✅ `images` - 内嵌镜像构建（可选）
+- ✅ `compose_override` - compose 覆盖（可选）
+
+#### ❌ lzc-build.yml 禁止的字段
+
+**以下字段应放在其他文件：**
+
+- ❌ `package`, `version`, `name`, `description`, `min_os_version`, `locales`, `author`, `license`, `homepage` → 应在 `package.yml`
+- ❌ `application`, `services`, `subdomain` → 应在 `lzc-manifest.yml`
+- ❌ `dockerfile`, `context` → 应在 `images` 配置内部
+
+#### LPK v2 默认布局（推荐）
+
 ```
 .
 ├── lzc-build.yml          # 构建配置
@@ -180,10 +252,19 @@ def classify_service(service_config):
 └── icon.png               # 应用图标
 ```
 
-**兼容性说明**：
-- LPK v2 (tar 格式) 是 1.5.0+ 的默认格式，需要 `package.yml`
-- LPK v1 (zip 格式) 仍兼容旧布局，但新项目应使用 v2
-- 若目标系统低于 lzcos v1.5.0，可考虑继续使用 v1 格式
+**package.yml 必须包含**：
+- `package` - 包 ID
+- `version` - 版本
+- `name`, `description` - 名称和描述
+- `min_os_version: 1.5.0` - **LPK v2 格式强制要求**
+
+**lzc-manifest.yml 只保留运行结构**：
+- `application` - 应用配置
+- `services` - 服务配置
+- `ext_config` - 扩展配置
+- `usage` - 使用说明
+
+详见 [references/strict-constraints.md](references/strict-constraints.md)
 
 ---
 
@@ -221,9 +302,120 @@ ext_config:
 
 ---
 
+## Passwordless Login Configuration
+
+**⚠️ 重要：所有自带密码体系的应用都必须配置免密登录！**
+
+LazyCat 微服要求应用提供良好的用户体验，用户不应该每次都手动输入密码。
+
+### 三种常用方案
+
+#### 方案一：部署参数 + simple-inject-password（简单场景）
+
+适用于登录账号固定或由部署参数提供的场景：
+
+```yaml
+# lzc-deploy-params.yml
+params:
+  - id: login_user
+    type: string
+    name: "Login User"
+    description: "Default login username"
+    default_value: "admin"
+
+  - id: login_password
+    type: secret
+    name: "Login Password"
+    description: "Default login password"
+    default_value: "$random(len=20)"
+
+# lzc-manifest.yml
+application:
+  injects:
+    - id: login-autofill
+      when:
+        - /login
+        - /signin
+      do:
+        - src: builtin://simple-inject-password
+          params:
+            user: "{{ index .U \"login_user\" }}"
+            password: "{{ index .U \"login_password\" }}"
+```
+
+#### 方案二：三阶段联动（高级场景）
+
+适用于用户首次创建账号、后续可能修改密码的场景：
+
+```yaml
+# request 阶段：捕获用户名/密码
+injects:
+  - id: capture-password
+    on: request
+    when:
+      - /api/login
+      - /api/setup
+    do: |
+      const payload = ctx.body.getJSON();
+      ctx.flow.set("pending_user", payload.username);
+      ctx.flow.set("pending_pass", payload.password);
+
+# response 阶段：成功后持久化
+  - id: commit-password
+    on: response
+    when:
+      - /api/login
+      - /api/setup
+    do: |
+      if (ctx.status >= 200 && ctx.status < 300) {
+        ctx.persist.set("saved_user", ctx.flow.get("pending_user"));
+        ctx.persist.set("saved_pass", ctx.flow.get("pending_pass"));
+      }
+
+# browser 阶段：自动填充
+  - id: autofill-login
+    when:
+      - /login
+    do:
+      - src: builtin://simple-inject-password
+        params:
+          user:
+            $persist: saved_user
+          password:
+            $persist: saved_pass
+```
+
+#### 方案三：Basic Auth Header 注入
+
+适用于上游服务使用 Basic Auth 的场景：
+
+```yaml
+application:
+  injects:
+    - id: inject-basic-auth
+      on: request
+      auth_required: false
+      when:
+        - /api/*
+      do: |
+        ctx.headers.set("Authorization", "Basic " + ctx.base64.encode("admin:password"));
+```
+
+### 关键注意事项
+
+1. **`on: request/response` 不能使用 hash 规则**（如 `/#login`）
+2. **request 阶段不要直接写入 `persist`**，先存入 `flow`，response 成功后再持久化
+3. **显式指定选择器**，确保特殊命名页面也能正确填充
+
+详见 [references/passwordless-login.md](references/passwordless-login.md)
+
+---
+
 ## Best Practices
 
 ### ✅ Do - LPK v2 完整示例（推荐，lzcos v1.5.0+）
+
+**⚠️ 重要：LPK v2 格式必须设置 `min_os_version: 1.5.0`**
 
 ```yaml
 # package.yml - 静态元数据
@@ -231,7 +423,7 @@ package: cloud.lazycat.app.myapp
 version: 1.0.0
 name: MyApp
 description: "My application"
-min_os_version: 1.3.8
+min_os_version: 1.5.0  # ✅ LPK v2 强制要求
 author: "Developer"
 license: MIT
 homepage: https://example.com
@@ -252,12 +444,21 @@ permissions:
 ```
 
 ```yaml
-# lzc-manifest.yml - 运行结构
+# lzc-manifest.yml - 运行结构（不包含静态元数据）
 application:
   subdomain: myapp
   upstreams:  # ✅ 推荐使用 upstreams 替代 routes
     - location: /
       backend: http://myapp:8080/
+  injects:  # ✅ 免密登录配置
+    - id: login-autofill
+      when:
+        - /login
+      do:
+        - src: builtin://simple-inject-password
+          params:
+            user: "{{ index .U \"login_user\" }}"
+            password: "{{ index .U \"login_password\" }}"
 
 services:
   postgres:
@@ -276,6 +477,41 @@ services:
       - /lzcapp/var/db:/var/lib/postgresql/data
 ```
 
+```yaml
+# lzc-build.yml - 构建配置（只包含构建相关字段）
+manifest: ./lzc-manifest.yml
+pkgout: ./
+icon: ./icon.png
+# ✅ 不包含 package, version, name 等静态元数据
+```
+
+```yaml
+# lzc-deploy-params.yml - 部署参数（严格按规范）
+params:
+  - id: login_user  # ✅ 小写英文+下划线
+    type: string  # ✅ 只使用 string/secret/bool/lzc_uid
+    name: "Login User"
+    description: "Default login username"
+    default_value: "admin"
+    optional: true
+
+  - id: login_password
+    type: secret
+    name: "Login Password"
+    description: "Default login password"
+    default_value: "$random(len=20)"
+    optional: true
+
+locales:
+  zh:
+    login_user:
+      name: "登录用户"
+      description: "默认登录用户名"
+    login_password:
+      name: "登录密码"
+      description: "默认登录密码"
+```
+
 ### ❌ Avoid - Common Mistakes
 
 ```yaml
@@ -284,6 +520,24 @@ services:
 package: cloud.lazycat.app.myapp
 version: 1.0.0
 name: MyApp
+
+# ❌ LPK v2 格式 min_os_version 设置过低
+min_os_version: 1.3.8  # ❌ LPK v2 必须是 1.5.0
+# ✅ 正确：min_os_version: 1.5.0
+
+# ❌ lzc-build.yml 包含不存在的字段
+package: myapp  # ❌ 应在 package.yml
+version: 1.0.0  # ❌ 应在 package.yml
+subdomain: myapp  # ❌ 应在 lzc-manifest.yml
+
+# ❌ lzc-deploy-params.yml 包含不存在的字段
+params:
+  - id: port
+    type: number  # ❌ 不支持 number 类型
+    min: 1  # ❌ 不存在 min 字段
+    max: 65535  # ❌ 不存在 max 字段
+    placeholder: "8080"  # ❌ 不存在 placeholder 字段
+    regex: "^[0-9]+$"  # ❌ 不存在 regex 字段
 
 # ❌ 旧格式 lzc-sdk-version
 lzc-sdk-version: "0.1"  # 已移除！
@@ -311,6 +565,17 @@ environment:
 # ❌ v1.5.0+ 使用旧文档路径
 binds:
   - /lzcapp/document:/data  # 使用 /lzcapp/documents
+
+# ❌ command 使用数组而非字符串
+services:
+  redis:
+    command: ["redis-server", "--requirepass", "mypass"]  # ❌
+    # ✅ 正确：command: redis-server --requirepass mypass
+
+# ❌ 缺少免密登录配置（密码体系应用必须有）
+application:
+  subdomain: myapp
+  # 缺少 injects 配置，用户每次都要手动输入密码
 ```
 
 ---
@@ -459,7 +724,7 @@ application:
 
 ## Critical Rules
 
-### 🚨 TOP 2 CRITICAL RULES
+### 🚨 TOP 5 CRITICAL RULES
 
 #### ❌ Rule 1: DO NOT Auto-Add Healthcheck
 如果原始 docker-compose.yml 没有 healthcheck，不要自动添加。容器可能缺少 curl/wget 工具。
@@ -476,6 +741,25 @@ services:
     setup_script: |
       cp /lzcapp/pkg/content/nginx.conf /etc/nginx/nginx.conf
 ```
+
+#### ❌ Rule 3: LPK v2 MUST Set min_os_version: 1.5.0
+LPK v2 格式（tar + package.yml）是 v1.5.0+ 才支持的特性：
+```yaml
+# package.yml
+package: cloud.lazycat.app.myapp
+version: 1.0.0
+min_os_version: 1.5.0  # ✅ 必须设置
+```
+
+#### ❌ Rule 4: DO NOT Generate Invalid Fields
+严格按官方规范生成配置文件，禁止生成不存在的字段：
+- lzc-build.yml: 禁止 `package`, `version`, `name`, `subdomain` 等
+- lzc-deploy-params.yml: 禁止 `placeholder`, `regex`, `min`, `max`, `type: number`
+
+#### ❌ Rule 5: All Password Apps MUST Have Passwordless Config
+如果应用自带密码体系，必须配置免密登录：
+- 使用 `simple-inject-password` 自动填充
+- 或使用三阶段联动记录用户修改的密码
 
 ---
 
@@ -505,6 +789,7 @@ GET https://search.lazycat.cloud/api/v1/app?keyword={app_name}&size=48
 | Background Task | false | 设置 background_task: true |
 | Package Prefix | cloud.lazycat.app | 包名前缀 |
 | Generate compose_override | true | 生成 compose_override |
+| Passwordless Login | true | **为密码体系应用自动配置免密登录** |
 
 ---
 

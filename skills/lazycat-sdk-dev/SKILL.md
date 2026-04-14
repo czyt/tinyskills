@@ -1,6 +1,6 @@
 ---
 name: lazycat-sdk-dev
-description: LazyCat SDK development skill for building applications with Go and JavaScript/TypeScript SDKs. Use when developing apps that need to interact with LazyCat microservice system APIs, query app lists, manage devices, handle file pickers, or use minidb. Triggers when code imports @lazycatcloud/sdk, gitee.com/linakesi/lzc-sdk, or when user asks about LazyCat SDK, device management, app queries, or system integration.
+description: LazyCat SDK development skill for building applications with Go and JavaScript/TypeScript SDKs, including frontend client capabilities for iOS/Android WebShell. Use when developing apps that need to interact with LazyCat microservice system APIs, query app lists, manage devices, handle file pickers, use minidb, or access client-side capabilities like AppCommon, MediaSession, navigation bar meta, full screen control, file/media sharing, theme mode, and platform-specific features. Triggers when code imports @lazycatcloud/sdk, gitee.com/linakesi/lzc-sdk, or when user asks about LazyCat SDK, client WebShell, device management, app queries, frontend extensions, or system integration.
 ---
 
 # LazyCat SDK Development
@@ -20,8 +20,9 @@ More languages coming soon: Rust, Dart, Cpp, Java, Python, Ruby, C#, PHP, Object
 
 | Document | Content |
 |----------|---------|
+| [references/frontend-extensions.md](references/frontend-extensions.md) | **前端客户端能力** - iOS/Android WebShell 能力矩阵，AppCommon API，导航栏/状态栏 meta，MediaSession 等 |
 | [references/go-sdk.md](references/go-sdk.md) | **Go SDK Complete Reference** - API Gateway, User/Device/Box/App management, HTTP handlers |
-| [references/js-sdk.md](references/js-sdk.md) | **JavaScript/TypeScript SDK Reference** - Basic usage, API operations |
+| [references/js-sdk.md](references/js-sdk.md) | **JavaScript/TypeScript SDK Reference** - Basic usage, API operations, frontend integration |
 | [references/extensions.md](references/extensions.md) | **Extensions** - minidb, file-pickers, cross-app communication |
 
 ---
@@ -174,6 +175,56 @@ gw.Box.Shutdown(ctx, &common.ShutdownRequest{
     Action: common.ShutdownRequest_Poweroff,
 })
 ```
+
+---
+
+## Frontend Client Capabilities
+
+LazyCat iOS/Android 客户端为 WebShell 内运行的前端应用注入了丰富的原生能力。
+
+### 环境判断
+
+```js
+import base from "@lazycatcloud/sdk/dist/extentions/base"
+
+const isIOS = base.isIosWebShell()
+const isAndroid = base.isAndroidWebShell()
+const isClient = isIOS || isAndroid
+```
+
+### 能力矩阵概览
+
+| 功能 | iOS | Android | 入口 |
+|-----|-----|---------|------|
+| 打开轻应用 | ✅ | ✅ | `AppCommon.LaunchApp` |
+| 禁用暗黑模式 | ✅ | ✅ | `meta lzcapp-disable-dark` |
+| 全屏控制 | ✅ | ✅ | `AppCommon.SetFullScreen` |
+| 文件分享 | ✅ | ✅ | `AppCommon.ShareWithFiles` |
+| 媒体分享 | ✅ | ✅ | `AppCommon.ShareMedia` |
+| 导航栏 meta | ✅ | ❌ | `lzcapp-navigation-bar-scheme` |
+| CSS 变量布局 | ✅ | ❌ | `--lzc-client-safearea-*` |
+| 音量/亮度 | ✅ | ❌ | `AppCommon.GetDeviceVolume` |
+| MediaSession | ❌ | ✅ | `MediaSession.*` |
+| 状态栏颜色 | ❌ | ✅ | `lzc_window.SetStatusBarColor` |
+| 控制栏显隐 | ❌ | ✅ | `lzc_tab.SetControlViewVisibility` |
+| 主题模式 | ❌ | ✅ | `lzc_theme.getThemeMode` |
+
+### AppCommon 快速示例
+
+```js
+import { AppCommon } from "@lazycatcloud/sdk/dist/extentions"
+
+// 打开其他应用
+await AppCommon.LaunchApp(url, "cloud.lazycat.app.photo")
+
+// 进入全屏
+await AppCommon.SetFullScreen()
+
+// 分享文件
+await AppCommon.ShareWithFiles("/path/to/file.pdf")
+```
+
+详见 [references/frontend-extensions.md](references/frontend-extensions.md)
 
 ---
 

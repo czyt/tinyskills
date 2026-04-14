@@ -79,6 +79,103 @@ if (apps.infoList.length > 0 && apps.infoList[0].status === 4) {
 
 ---
 
+## Environment Detection
+
+### Detect Client WebShell
+
+When developing frontend apps that run inside LazyCat iOS/Android client, you need to detect the environment:
+
+```js
+import base from "@lazycatcloud/sdk/dist/extentions/base"
+
+// Detect platform
+const isIOS = base.isIosWebShell()
+const isAndroid = base.isAndroidWebShell()
+const isClient = isIOS || isAndroid
+
+// Safe call wrapper
+export function safeCall(fn, fallback) {
+  try {
+    return fn ? fn() : fallback
+  } catch (error) {
+    console.warn("[client-api] call failed", error)
+    return fallback
+  }
+}
+```
+
+### Conditional API Usage
+
+```js
+import { AppCommon } from "@lazycatcloud/sdk/dist/extentions"
+import base from "@lazycatcloud/sdk/dist/extentions/base"
+
+export async function openApp(url, appid) {
+  if (base.isClientWebShell()) {
+    await AppCommon.LaunchApp(url, appid)
+  } else {
+    // Browser fallback
+    window.location.href = url
+  }
+}
+```
+
+---
+
+## AppCommon Extensions
+
+The `AppCommon` module provides iOS/Android client capabilities:
+
+```js
+import { AppCommon } from "@lazycatcloud/sdk/dist/extentions"
+
+// Launch another app
+await AppCommon.LaunchApp(url, appid, { forcedRefresh: true })
+
+// Full screen control
+await AppCommon.SetFullScreen()
+await AppCommon.CancelFullScreen()
+const isFull = await AppCommon.GetFullScreenStatus()
+
+// File sharing
+await AppCommon.ShareWithFiles(path)
+await AppCommon.ShareWithFiles(undefined, [path1, path2])
+
+// Media sharing
+await AppCommon.ShareMedia({ ids: ["media-id-1"] })
+
+// Open with other app
+await AppCommon.OpenWith(boxName, path, appid)
+
+// iOS only: brightness/volume
+await AppCommon.SetScreenBrightness(0.5)
+await AppCommon.SetDeviceVolume(0.5)
+const brightness = await AppCommon.GetScreenBrightness()
+const volume = await AppCommon.GetDeviceVolume()
+```
+
+---
+
+## MediaSession (Android Only)
+
+For audio player apps on Android, use MediaSession for lock screen control:
+
+```js
+import {
+  MediaSession,
+  isMediaSessionAvailable,
+} from "@lazycatcloud/sdk/dist/extentions/mediasession/index"
+
+if (isMediaSessionAvailable()) {
+  await MediaSession.setMetadata({ title: "My Track" })
+  await MediaSession.setPlaybackState({ playbackState: "playing" })
+  await MediaSession.setActionHandler({ action: "play" }, () => audio.play())
+  await MediaSession.setActionHandler({ action: "pause" }, () => audio.pause())
+}
+```
+
+---
+
 ## Frontend Integration
 
 For web applications running inside LazyCat:
