@@ -1,0 +1,99 @@
+name: Update Skills Submodules
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allow manual trigger
+
+jobs:
+  update-submodules:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Get submodule list
+        id: submodules
+        run: |
+          # Get all submodule paths
+          SUBMODULES=$(git config --file .gitmodules --get-regexp path | awk '{print $2}')
+          echo "submodules=$SUBMODULES" >> $GITHUB_OUTPUT
+
+          # Count submodules
+          COUNT=$(echo "$SUBMODULES" | wc -l)
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+          echo "Found $COUNT submodules:"
+          echo "$SUBMODULES"
+
+      - name: Update submodules to latest
+        id: update
+        run: |
+          # Update all submodules to their latest remote versions
+          git submodule update --remote --merge
+
+          # Check if any submodule has changed
+          if git diff --quiet; then
+            echo "No submodule updates available"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Submodules have updates"
+            echo "changed=true" >> $GITHUB_OUTPUT
+
+            # Show what changed
+            echo "### Changes detected:"
+            git diff --stat
+          fi
+
+      - name: Commit and push updates
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          # Get current date for commit message
+          DATE=$(date -u +'%Y-%m-%d')
+
+          # Get list of updated submodules
+          CHANGED_SUBMODULES=$(git status --porcelain | grep '^M ' | awk '{print $2}' | grep '^skills/')
+
+          COMMIT_MSG="chore: update skills submodules ($DATE)\n\nUpdated:"
+          for sub in $CHANGED_SUBMODULES; do
+            cd "$sub"
+            NEW_MSG=$(git log -1 --pretty=format:'%s')
+            NEW_HASH=$(git rev-parse --short HEAD)
+            cd ..
+            COMMIT_MSG="${COMMIT_MSG}\n- $sub: $NEW_HASH ($NEW_MSG)"
+          done
+
+          # Stage changes
+          git add .gitmodules skills/
+
+          # Commit with detailed message
+          git commit -m "$(echo -e "$COMMIT_MSG")"
+
+          # Push directly to main
+          git push origin main
+
+          echo "Successfully pushed submodule updates"
+
+      - name: Summary
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          echo "### Update Summary"
+          echo ""
+          echo "Total submodules checked: ${{ steps.submodules.outputs.count }}"
+          echo "Submodules updated: See commit message"
+          echo ""
+          echo "Changes have been pushed directly to main branch."
