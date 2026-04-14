@@ -385,10 +385,25 @@ const files = await pickFiles({
 | defer gw.Close() 未执行 | panic 或提前退出 | 确保 defer 在创建后立即调用 |
 | 前端环境判断错误 | 在非 WebShell 中调用原生能力 | 先用 `isIosWebShell()`/`isAndroidWebShell()` 判断 |
 
+### 边界条件处理
+
+| 边界情况 | 判断条件 | 处理方式 |
+|---------|---------|---------|
+| 空用户ID | `uid == ""` | 返回空结果，不调用 SDK |
+| 空设备列表 | `resp.Devices == nil` | 返回 `[]Device{}`，不报错 |
+| 离线设备操作 | `!device.IsOnline` | 提示用户设备离线，跳过操作 |
+| 无权限操作 | `userRole != "admin"` | 返回权限错误，记录日志 |
+| SDK 版本不匹配 | import 失败 | 提示更新 SDK 版本 |
+
 ### Fallback 模式示例
 
 ```go
 func queryDevices(ctx context.Context, uid string) ([]Device, error) {
+    // 边界条件：空用户ID
+    if uid == "" {
+        return []Device{}, nil
+    }
+
     gw, err := gohelper.NewAPIGateway(ctx)
     if err != nil {
         // Fallback: 返回空列表而非失败
@@ -405,6 +420,12 @@ func queryDevices(ctx context.Context, uid string) ([]Device, error) {
         log.Printf("device query failed: %v", err)
         return []Device{}, nil
     }
+
+    // 边界条件：空设备列表
+    if resp.Devices == nil {
+        return []Device{}, nil
+    }
+
     return resp.Devices, nil
 }
 ```
