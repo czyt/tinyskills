@@ -1,2 +1,4 @@
 timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-04-15T10:00	baseline	lazycat-app-publisher	-	46	baseline	-	初始评估：核心模板语法{{.INTERNAL.xxx}}为幻觉，应为{{ stable_secret "xxx" }}	dry_run
+2026-04-15T10:15	26a2a7b	lazycat-app-publisher	46	88.5	keep	指令具体性,实测表现	修正模板语法为{{ stable_secret "xxx" }}，引用官方文档	dry_run
+2026-04-15T10:20	b3d6efc	lazycat-app-publisher	88.5	92	keep	资源整合度	添加官方开发文档网站链接表格	dry_run
