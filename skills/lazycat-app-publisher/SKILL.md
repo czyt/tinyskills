@@ -58,6 +58,19 @@ preferences:
 
 协助将 Docker Compose 文件和 Docker 命令转换为 LazyCat Cloud 应用配置，提供**智能依赖分析**和**自动配置优化**。
 
+## 权威文档来源
+
+| 来源 | URL | 说明 |
+|------|-----|------|
+| **官方开发文档** | https://developer.lazycat.cloud | ⭐ 懒猫微服开发者官方文档，权威参考 |
+| **模板渲染文档** | https://developer.lazycat.cloud/docs/advanced-manifest-render | manifest.yml 模板语法（stable_secret 等） |
+| **环境变量文档** | https://developer.lazycat.cloud/docs/advanced-envs | 运行时/部署时环境变量列表 |
+| **构建配置文档** | https://developer.lazycat.cloud/docs/spec/build | lzc-build.yml 规范 |
+| **部署参数文档** | https://developer.lazycat.cloud/docs/spec/deploy-params | lzc-deploy-params.yml 规范 |
+| **文档仓库** | https://gitee.com/lazycatcloud/lzc-developer-doc | 开发者文档源码仓库 |
+
+**⚠️ 重要原则：** 遇到不确定的字段或语法时，优先查阅官方文档验证，避免生成幻觉内容。
+
 ## Reference Documents
 
 | Document | Content |
