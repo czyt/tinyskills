@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我为 https://github.com/user/myapp 创建一个 Homebrew Cask，这是一个 macOS GUI 应用，发布文件是 myapp.dmg",
+    "expected": "询问类型确认（GUI应用→Cask），生成 Cask 文件模板，生成 GitHub Actions workflow，sha256 使用 PLACEHOLDER"
+  },
+  {
+    "id": 2,
+    "prompt": "我想发布 FiraCode 字体到 Homebrew，上游是 https://github.com/tonsky/FiraCode",
+    "expected": "确认是 Font 类型，提醒命名规则（font-fira-code.rb），提醒需要独立 homebrew-fonts Tap，生成 Font Cask 模板"
+  },
+  {
+    "id": 3,
+    "prompt": "帮我更新 Homebrew Tap 中的 myapp 版本到 2.0.0",
+    "expected": "读取现有 Cask 文件，更新 version 和 sha256（通过 workflow），生成 commit message"
+  }
+]

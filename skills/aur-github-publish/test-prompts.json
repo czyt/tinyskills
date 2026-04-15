@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我创建一个 AUR 包，上游是 https://github.com/user/mycli，提供预编译二进制文件 mycli-linux-amd64",
+    "expected": "确认是 -bin 类型，询问包名（推荐 mycli-bin），生成 PKGBUILD 模板，提醒首次发布需手动 clone AUR 仓库，sha256sums 使用 SKIP"
+  },
+  {
+    "id": 2,
+    "prompt": "我想把 FiraCode 字体发布到 AUR",
+    "expected": "确认是 -font 类型，arch=('any')，depends 包含 fontconfig，提醒命名规则（fira-code-font 或 font-firacode）"
+  },
+  {
+    "id": 3,
+    "prompt": "帮我更新 AUR 中的 myapp-bin 包版本到 2.0.0",
+    "expected": "读取现有 PKGBUILD，更新 pkgver 和重置 pkgrel=1，生成 .SRCINFO，提醒 workflow 自动计算 checksum"
+  }
+]
