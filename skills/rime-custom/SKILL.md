@@ -164,24 +164,25 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 
 询问用户使用的输入方案：
 
-| 用户提及 | 方案 | custom.yaml 文件 |
-|---------|------|-----------------|
-| "雾凇/冰/雪" | rime-ice | `rime_ice.custom.yaml` |
-| "白霜/霜/纯净" | rime-frost | `rime_frost.custom.yaml` |
-| "薄荷/Mint" | rime_mint | `rime_mint.custom.yaml` |
-| "万象(标准版)" | wanxiang | `wanxiang.custom.yaml` |
-| "万象Pro/增强版" | wanxiang_pro | `wanxiang_pro.custom.yaml` |
-| "朙月" | luna_pinyin | `luna_pinyin.custom.yaml` |
-| "双拼" | double_pinyin | `double_pinyin.custom.yaml` |
+> ⚠️ **核心规则**：各方案都有多种变体（双拼、五笔、T9等）。**先查看配置目录实际的 `*.schema.yaml` 文件名**，再决定对应的 `*.custom.yaml` 文件名。
 
-> 🛑 **检查点（方案确认）**：确认方案后再继续。不确定时问用户：
-> - "您用的是哪个方案？雾凇、白霜、薄荷还是万象？"
-> - 如果用户不知道方案名，询问："您是刚安装还是已配置？刚安装请查看当前使用的配置文件名。"
-> - 提供决策辅助：
->   - 需要丰富词库+Emoji → 雾凇
->   - 需要纯净+墨奇辅码 → 白霜
->   - 新手入门+简单配置 → 薄荷
->   - 繁简混输+高级定制 → 万象
+**主要方案及其常见变体**：
+
+| 用户提及 | 方案系列 | 常见变体及 custom.yaml 文件 |
+|---------|---------|---------------------------|
+| "雾凇/冰/雪" | rime-ice | `rime_ice.custom.yaml` (全拼) |
+| "白霜/霜/纯净" | rime-frost | `rime_frost.custom.yaml` (全拼) |
+| "薄荷/Mint" | rime_mint | `rime_mint.custom.yaml` (全拼)、`rime_mint_flypy.custom.yaml` (双拼)、`double_pinyin_*.custom.yaml` (各双拼变体) |
+| "万象" | wanxiang | `wanxiang.custom.yaml` (标准版)、`wanxiang_pro.custom.yaml` (Pro版)、`wanxiang_*.custom.yaml` (其他变体) |
+| "朙月" | luna_pinyin | `luna_pinyin.custom.yaml` |
+| "双拼" | double_pinyin | 根据具体双拼类型：`double_pinyin_flypy.custom.yaml` (小鹤)、`double_pinyin_mspy.custom.yaml` (微软) 等 |
+| "五笔" | wubi | `wubi86_jidian.custom.yaml` (86版)、`wubi98_mint.custom.yaml` (98版) |
+| "九宫格/T9" | t9 | `t9.custom.yaml` 或 `wanxiang_t9.custom.yaml` |
+
+**快速识别规则**：
+- 文件名格式：`{schema_id}.custom.yaml`
+- schema_id 通常与 `*.schema.yaml` 文件名前缀一致
+- 如有疑问，先列出目录中的 schema 文件再确定
 
 **边界情况处理**：
 - 用户提及的方案名不在已知列表 → 先查看配置目录实际文件，确认后再配置
@@ -196,6 +197,18 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 
 ### 雾凇拼音 (rime-ice)
 
+雾凇是**系列方案**，包含多种输入方式：
+
+**雾凇系列方案变体**：
+
+| 方案变体 | Schema文件 | Custom文件 | 特点 |
+|---------|-----------|-----------|------|
+| **全拼输入** | `rime_ice.schema.yaml` | `rime_ice.custom.yaml` | 默认方案，词库丰富 |
+| **双拼输入** | `rime_ice_double.schema.yaml` | `rime_ice_double.custom.yaml` | 双拼变体（部分发行版） |
+
+> ⚠️ 不同雾凇发行版可能包含不同变体，请先查看实际文件。
+
+**主要文件**：
 | 文件类型 | 文件名 | 说明 |
 |---------|-------|------|
 | Schema主文件 | `rime_ice.schema.yaml` | 主方案配置，勿直接修改 |
@@ -225,6 +238,18 @@ patch:
 
 ### 白霜拼音 (rime-frost)
 
+白霜是**系列方案**，包含多种输入方式：
+
+**白霜系列方案变体**：
+
+| 方案变体 | Schema文件 | Custom文件 | 特点 |
+|---------|-----------|-----------|------|
+| **全拼输入** | `rime_frost.schema.yaml` | `rime_frost.custom.yaml` | 默认方案，词频优化 |
+| **双拼输入** | `rime_frost_double.schema.yaml` | `rime_frost_double.custom.yaml` | 双拼变体（部分发行版） |
+
+> ⚠️ 不同白霜发行版可能包含不同变体，请先查看实际文件。
+
+**主要文件**：
 | 文件类型 | 文件名 | 说明 |
 |---------|-------|------|
 | Schema主文件 | `rime_frost.schema.yaml` | 主方案配置 |
@@ -250,26 +275,33 @@ patch:
 
 ### 万象拼音 (wanxiang)
 
-万象有两个主要版本：
+万象是**系列方案**，包含多种变体，配置前请先确认实际使用的 schema 文件名。
 
-**标准版 (Standard)**：
-| 文件类型 | 文件名 | 说明 |
-|---------|-------|------|
-| Schema主文件 | `wanxiang.schema.yaml` | 主方案（含多种双拼） |
-| Custom覆写 | `wanxiang.custom.yaml` | 用户定制配置 |
-| 语法模型 | `grammar.bin` | kenlm语言模型（需单独下载） |
+> ⚠️ **重要**：万象通过 `/` 指令在输入状态动态切换双拼/全拼模式（如 `/flypy`），但不同变体有不同的 schema 文件和 custom.yaml 配置。
 
-**Pro增强版**：
-| 文件类型 | 文件名 | 说明 |
-|---------|-------|------|
-| Schema主文件 | `wanxiang_pro.schema.yaml` | 仅支持双拼，含7种辅助码 |
-| Custom覆写 | `wanxiang_pro.custom.yaml` | 用户定制配置 |
-| 辅码文件 | `aux_code.dict.yaml` | 辅助码映射 |
-| 反查库 | `reverse.dict.yaml` | 拼音反查 |
+**万象系列方案变体**：
+
+| 方案变体 | Schema文件 | Custom文件 | 特点 |
+|---------|-----------|-----------|------|
+| **标准版** | `wanxiang.schema.yaml` | `wanxiang.custom.yaml` | 全拼/双拼通用，自动调频 |
+| **Pro增强版** | `wanxiang_pro.schema.yaml` | `wanxiang_pro.custom.yaml` | 仅双拼，7种辅助码，手动造词 |
+| **英文方案** | `wanxiang_english.schema.yaml` | `wanxiang_english.custom.yaml` | 英文整句输入 |
+| **混合编码** | `wanxiang_mixedcode.schema.yaml` | `wanxiang_mixedcode.custom.yaml` | 中英混合编码 |
+| **反查方案** | `wanxiang_reverse.schema.yaml` | `wanxiang_reverse.custom.yaml` | 拼音反查专用 |
+| **T9九宫格** | `wanxiang_t9.schema.yaml` | `wanxiang_t9.custom.yaml` | 九宫格输入（移动端） |
+
+**标准版 vs Pro 版对比**：
+
+| 差异项 | 标准版 | Pro版 |
+|--------|--------|-------|
+| 支持类型 | 全拼、任意双拼 | 仅双拼 |
+| 自动调频 | 默认开启 | 默认关闭 |
+| 辅助码 | 仅声调辅助 | 7种可选辅助码 |
+| 用户词记录 | 自动积累 | 手动造词（`` 引导） |
 
 **特有功能配置**：
 - 7种辅助码：墨奇、鹤形、自然、虎码、五笔、汉心、首右
-- 方案切换指令：`/flypy` `/mspy` `/zrm` `/sogou` `/pinyin`
+- 方案切换指令：`/flypy` `/mspy` `/zrm` `/sogou` `/pinyin` `/wxsp` `/zrlong` `/hxlong`
 - 语法模型：需下载 `grammar.bin` 放入用户目录
 - 声调辅助：`7890` 代表 `1234` 声
 
@@ -299,15 +331,28 @@ patch:
 
 > **注意**：此处以 Mintimate/oh-my-rime 官方 upstream 当前命名为准。不同薄荷衍生包可能使用不同文件名（如早期版本使用 `mint.schema.yaml`），请先查看实际文件确认。
 
-| 文件类型 | 文件名 | 说明 |
-|---------|-------|------|
-| Schema主文件 | `rime_mint.schema.yaml` | 主方案配置 |
-| Custom覆写 | `rime_mint.custom.yaml` | 用户定制配置 |
+薄荷是**系列方案**，包含多种输入方式：
+
+**薄荷系列方案变体**：
+
+| 方案变体 | Schema文件 | Custom文件 | 特点 |
+|---------|-----------|-----------|------|
+| **全拼输入** | `rime_mint.schema.yaml` | `rime_mint.custom.yaml` | 默认方案，新手友好 |
+| **小鹤双拼** | `rime_mint_flypy.schema.yaml` | `rime_mint_flypy.custom.yaml` | 小鹤双拼+辅码支持 |
+| **通用双拼** | `double_pinyin.schema.yaml` | `double_pinyin.custom.yaml` | 通用双拼框架 |
+| **ABC双拼** | `double_pinyin_abc.schema.yaml` | `double_pinyin_abc.custom.yaml` | ABC双拼 |
+| **微软双拼** | `double_pinyin_mspy.schema.yaml` | `double_pinyin_mspy.custom.yaml` | Windows内置双拼 |
+| **搜狗双拼** | `double_pinyin_sogou.schema.yaml` | `double_pinyin_sogou.custom.yaml` | 搜狗双拼 |
+| **紫光双拼** | `double_pinyin_ziguang.schema.yaml` | `double_pinyin_ziguang.custom.yaml` | 紫光双拼 |
+| **地球拼音** | `terra_pinyin.schema.yaml` | `terra_pinyin.custom.yaml` | 带调拼音输入 |
+| **九宫格T9** | `t9.schema.yaml` | `t9.custom.yaml` | 九宫格输入（移动端） |
+| **86五笔** | `wubi86_jidian.schema.yaml` | `wubi86_jidian.custom.yaml` | 极点五笔86 |
+| **98五笔** | `wubi98_mint.schema.yaml` | `wubi98_mint.custom.yaml` | 五笔98版 |
 
 **特点**：
 - 新手友好，配置简单
 - 支持 MCP 知识库查询（薄荷官方提供）
-- 基础功能齐全，适合入门
+- 词库使用万象拼音词库（2025-07后）
 
 **配置示例**：
 ```yaml
