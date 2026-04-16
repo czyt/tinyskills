@@ -4,3 +4,4 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-04-15T10:10	round2	lazycat-app-publisher	78.0	80.0	keep	整体架构	添加Healthcheck快速参考章节，减少信息冗余	dry_run
 2026-04-15T10:15	final	lazycat-app-publisher	-	80.0	confirmed	-	用户确认保留所有改进	dry_run
 2026-04-16T09:30	b1c1cf7	lazycat-app-publisher	-	83.8	baseline	-	多入口添加后基线评估	dry_run
+2026-04-16T09:35	5403484	lazycat-app-publisher	83.8	86.3	keep	实测表现	Quick Start添加多入口配置示例，减少references依赖	dry_run
