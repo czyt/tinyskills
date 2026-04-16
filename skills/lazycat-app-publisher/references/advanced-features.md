@@ -6,7 +6,156 @@
 
 ---
 
-## 1. compose_override - 覆盖不支持的参数
+## 1. 多入口支持 (Multi-Entry Points)
+
+### 作用
+
+当一个应用需要提供多个入口（例如主界面与管理界面）时，可以在 `lzc-manifest.yml` 中使用 `application.entries` 声明多个入口。启动器会为同一应用（右键菜单）展示多个入口按钮，方便用户直达不同页面。
+
+### 版本要求
+
+⚠️ **硬性要求：lzcos v1.4.3+**
+
+使用多入口功能时，必须设置 `min_os_version: 1.4.3` 或更高版本。
+
+### 语法格式
+
+```yaml
+# lzc-manifest.yml
+application:
+  subdomain: demoapp
+  entries:
+    - id: main
+      title: "Main"
+      path: /
+    - id: admin
+      title: "Admin"
+      path: /admin
+      prefix_domain: admin
+```
+
+### 多语言本地化
+
+入口标题可通过 `locales` 的 `entries.<entry_id>.title` 做多语言本地化：
+
+```yaml
+# package.yml
+locales:
+  en:
+    entries.main.title: "Main"
+    entries.admin.title: "Admin Console"
+  zh:
+    entries.main.title: "主界面"
+    entries.admin.title: "管理后台"
+```
+
+### 字段说明
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `id` | ✅ | 入口唯一标识，必须在应用内保持唯一 |
+| `title` | ✅ | 入口显示名称，支持通过 locales 本地化 |
+| `path` | ✅ | 入口路径，通常以 `/` 开头 |
+| `prefix_domain` | ❌ | 入口域名前缀，最终域名表现为 `<prefix>-<subdomain>.<rootdomain>` |
+
+### 使用场景示例
+
+#### 场景 1：主界面 + 管理后台
+
+```yaml
+application:
+  subdomain: myapp
+  entries:
+    - id: main
+      title: "Main"
+      path: /
+    - id: admin
+      title: "Admin Panel"
+      path: /admin
+```
+
+**用户体验：**
+- 右键应用图标 → 显示 "Main" 和 "Admin Panel" 两个入口
+- 点击 "Main" → 访问 `https://myapp.xxx.lzcapp/`
+- 点击 "Admin Panel" → 访问 `https://myapp.xxx.lzcapp/admin`
+
+#### 场景 2：独立域名入口
+
+```yaml
+application:
+  subdomain: blog
+  entries:
+    - id: blog
+      title: "Blog"
+      path: /
+    - id: admin
+      title: "Admin"
+      path: /
+      prefix_domain: admin
+```
+
+**用户体验：**
+- 点击 "Blog" → 访问 `https://blog.xxx.lzcapp/`
+- 点击 "Admin" → 访问 `https://admin-blog.xxx.lzcapp/`
+
+### 最佳实践
+
+1. **只为真正需要直接访问的页面创建入口**
+   - 避免入口过多造成使用混淆
+   - 廸议不超过 3-4 个入口
+
+2. **入口命名清晰**
+   - 使用直观的名称（Main、Admin、Settings）
+   - 配置多语言本地化
+
+3. **路径规划合理**
+   - 主入口使用 `/`
+   - 其他入口使用有意义的路径前缀
+
+### 完整示例
+
+```yaml
+# package.yml
+package: cloud.lazycat.app.myapp
+version: 1.0.0
+name: MyApp
+description: "My application with multi-entry support"
+min_os_version: 1.4.3  # ⚠️ 硬性要求
+
+locales:
+  en:
+    name: "My App"
+    description: "My application"
+    entries.main.title: "Main Interface"
+    entries.admin.title: "Admin Console"
+  zh:
+    name: "我的应用"
+    description: "我的应用"
+    entries.main.title: "主界面"
+    entries.admin.title: "管理后台"
+
+# lzc-manifest.yml
+application:
+  subdomain: myapp
+  entries:
+    - id: main
+      title: "Main"
+      path: /
+    - id: admin
+      title: "Admin"
+      path: /admin
+  upstreams:
+    - location: /
+      backend: http://web:8080/
+
+services:
+  web:
+    image: myapp:latest
+```
+
+---
+
+## 2. compose_override - 覆盖不支持的参数
 
 ### 作用
 当 LazyCat 原生不支持某些 Docker Compose 参数时，通过 `compose_override` 在构建时注入这些参数。
@@ -127,7 +276,7 @@ compose_override:
 
 ---
 
-## 2. 高级路由配置
+## 3. 高级路由配置
 
 ### 2.1 upstreams（推荐）
 
@@ -413,7 +562,7 @@ services:
 
 ---
 
-## 3. 资源限制
+## 4. 资源限制
 
 ### 3.1 CPU 配置
 
@@ -510,7 +659,7 @@ services:
 
 ---
 
-## 4. 网络配置
+## 5. 网络配置
 
 ### 4.1 网络模式
 
@@ -584,7 +733,7 @@ services:
 
 ---
 
-## 5. 文件处理（File Handlers）
+## 6. 文件处理（File Handlers）
 
 ### 5.1 概述
 文件处理允许应用处理特定文件类型，支持 MIME 类型和自定义处理逻辑。
@@ -675,7 +824,7 @@ services:
 
 ---
 
-## 6. Setup Scripts & Initialization
+## 7. Setup Scripts & Initialization
 
 ### 6.1 setup_script
 
@@ -754,7 +903,7 @@ services:
 
 ---
 
-## 7. 环境变量与模板渲染
+## 8. 环境变量与模板渲染
 
 ### 7.1 模板变量语法
 
@@ -819,7 +968,7 @@ services:
 
 ---
 
-## 8. 高级配置选项
+## 9. 高级配置选项
 
 ### 8.1 ext_config（扩展配置）
 
@@ -919,7 +1068,7 @@ services:
 
 ---
 
-## 9. USB/GPU/KVM 硬件加速
+## 10. USB/GPU/KVM 硬件加速
 
 ### 9.1 USB 设备直通
 
@@ -980,7 +1129,7 @@ compose_override:
 
 ---
 
-## 10. 完整高级应用示例
+## 11. 完整高级应用示例
 
 ### 场景：带 GPU 加速的 AI 应用 + 数据库 + 文件处理
 
@@ -1149,7 +1298,7 @@ compose_override:
 
 ---
 
-## 11. 最佳实践检查清单
+## 12. 最佳实践检查清单
 
 ### 发布前检查
 
@@ -1196,7 +1345,7 @@ compose_override:
 
 ---
 
-## 12. 故障排除
+## 13. 故障排除
 
 ### 常见问题
 
@@ -1228,7 +1377,7 @@ mem_reservation: 4096M  # 4GB 保留
 
 ---
 
-## 13. 参考文档
+## 14. 参考文档
 
 ### 官方文档
 - **Manifest 规范**: `/home/czyt/Desktop/lzc-developer-doc-master/docs/spec/manifest.md`
