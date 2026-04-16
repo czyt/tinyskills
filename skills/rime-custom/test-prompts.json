@@ -5,37 +5,49 @@
       "id": 1,
       "name": "basic-custom-config",
       "prompt": "我使用小狼毫输入法，想配置雾凇拼音方案，希望有 9 个候选词、横向显示、启用模糊拼音（zh/ch/sh 和 z/c/s）",
-      "expected": "生成 rime_ice.custom.yaml 配置文件，包含 page_size、horizontal、模糊拼音 algebra"
+      "expected": "生成 rime_ice.custom.yaml 配置文件，包含 page_size: 9、horizontal: true、模糊拼音 speller/algebra derive 规则"
     },
     {
       "id": 2,
-      "name": "emoji-opencc-config",
+      "name": "emoji-filter-config",
       "prompt": "帮我在鼠须管上配置 Emoji 支持，同时添加简繁转换开关",
-      "expected": "生成包含 emoji_suggestion 和 simplifier/opencc_config 的配置，提供繁简开关设置"
+      "expected": "生成包含 engine/filters/@next: simplifier@emoji 和 simplifier@emoji/opencc_config 的配置，提供繁简开关 switches 设置"
     },
     {
       "id": 3,
       "name": "lua-time-extension",
       "prompt": "我想在输入 time 时显示当前时间，输入 date 时显示日期，怎么配置？",
-      "expected": "提供 rime.lua 的 lua_translator 代码和 custom.yaml 中的启用配置"
+      "expected": "提供 rime.lua 的 lua_translator 代码示例和 custom.yaml 中 engine/translators/@next: lua_translator@time_translator 的启用配置"
     },
     {
       "id": 4,
       "name": "symbol-input",
       "prompt": "配置特殊符号输入，输入 /star 显示星号，/heart 显示心形",
-      "expected": "生成 punctuator/symbols 配置，包含 /star 和 /heart 的符号映射"
+      "expected": "生成 punctuator/symbols 配置，包含 '/star': ['★', '☆'] 和 '/heart': ['♥', '♡'] 的符号映射"
     },
     {
       "id": 5,
       "name": "sync-multi-device",
       "prompt": "我有两台电脑，想同步 Rime 的用户词库和配置，怎么做？",
-      "expected": "说明同步机制、sync.conf 配置、部署命令和同步工作流"
+      "expected": "说明同步机制、sync.conf 配置格式、rime_dict_manager --sync 命令和同步工作流步骤"
     },
     {
       "id": 6,
       "name": "scheme-selection",
       "prompt": "帮我了解雾凇、白霜、薄荷、万象这几个方案的区别，推荐一个适合我的",
-      "expected": "对比四个方案的特点、适用场景，根据用户需求给出推荐"
+      "expected": "对比四个方案（rime-ice/rime-frost/rime_mint/wanxiang）的特点、配置文件名、适用场景，根据用户需求给出推荐"
+    },
+    {
+      "id": 7,
+      "name": "grammar-language-model",
+      "prompt": "我想在万象方案中启用语言模型，提升整句输入准确度",
+      "expected": "提供 grammar/language: grammar.bin 的现代配置方式，说明 grammar.bin 文件放置位置"
+    },
+    {
+      "id": 8,
+      "name": "schema-file-name-check",
+      "prompt": "我刚安装了薄荷输入法，想修改候选词数量，但不知道配置文件叫什么名字",
+      "expected": "引导用户先查看配置目录中的 *.schema.yaml 文件名，确认 schema_id，再决定对应的 *.custom.yaml 文件名（应为 rime_mint.custom.yaml）"
     }
   ]
 }

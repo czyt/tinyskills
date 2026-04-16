@@ -138,7 +138,7 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 |------|------|---------|---------|
 | **雾凇 (rime-ice)** | 简体拼音、词库丰富(100万+)、Emoji、拆字反查 | `rime_ice.schema.yaml` | 日常输入、简体用户 |
 | **白霜 (rime-frost)** | 词频优化(745M语料)、纯净、墨奇辅助码 | `rime_frost.schema.yaml` | 极简风格、辅助码爱好者 |
-| **薄荷 (mint)** | 简体拼音、新手友好、MCP知识库 | `mint.schema.yaml` | 新手入门 |
+| **薄荷 (rime_mint)** | 简体拼音、新手友好、MCP知识库 | `rime_mint.schema.yaml` | 新手入门 |
 | **万象 (wanxiang)** | 繁简混输、语法模型、7种辅助码 | `wanxiang.schema.yaml` | 繁体用户、高级定制 |
 
 > 🔍 选择建议：日常用雾凇/白霜，繁体用万象，新手用薄荷。
@@ -157,6 +157,8 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 
 ### Step 1: 确定方案 ⚠️
 
+**重要规则**：先查看配置目录中实际的 `schema_id` 和现有 `*.schema.yaml` 文件名，再决定对应的 `*.custom.yaml` 文件名。**不要只按方案中文名猜测文件名**，不同衍生版本可能有不同的命名。
+
 **输入**：用户描述需求或提及方案名
 **输出**：确定方案类型，对应 custom.yaml 文件名
 
@@ -166,8 +168,9 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 |---------|------|-----------------|
 | "雾凇/冰/雪" | rime-ice | `rime_ice.custom.yaml` |
 | "白霜/霜/纯净" | rime-frost | `rime_frost.custom.yaml` |
-| "薄荷/Mint" | mint | `mint.custom.yaml` |
-| "万象" | wanxiang | `wanxiang.custom.yaml` |
+| "薄荷/Mint" | rime_mint | `rime_mint.custom.yaml` |
+| "万象(标准版)" | wanxiang | `wanxiang.custom.yaml` |
+| "万象Pro/增强版" | wanxiang_pro | `wanxiang_pro.custom.yaml` |
 | "朙月" | luna_pinyin | `luna_pinyin.custom.yaml` |
 | "双拼" | double_pinyin | `double_pinyin.custom.yaml` |
 
@@ -242,12 +245,21 @@ patch:
 
 ### 万象拼音 (wanxiang)
 
+万象有两个主要版本：
+
+**标准版 (Standard)**：
 | 文件类型 | 文件名 | 说明 |
 |---------|-------|------|
 | Schema主文件 | `wanxiang.schema.yaml` | 主方案（含多种双拼） |
 | Custom覆写 | `wanxiang.custom.yaml` | 用户定制配置 |
 | 语法模型 | `grammar.bin` | kenlm语言模型（需单独下载） |
-| 辅码文件 | `aux_code.dict.yaml` | 辅助码映射（PRO版） |
+
+**Pro增强版**：
+| 文件类型 | 文件名 | 说明 |
+|---------|-------|------|
+| Schema主文件 | `wanxiang_pro.schema.yaml` | 仅支持双拼，含7种辅助码 |
+| Custom覆写 | `wanxiang_pro.custom.yaml` | 用户定制配置 |
+| 辅码文件 | `aux_code.dict.yaml` | 辅助码映射 |
 | 反查库 | `reverse.dict.yaml` | 拼音反查 |
 
 **特有功能配置**：
@@ -278,12 +290,14 @@ patch:
 /pinyin  → 切换全拼
 ```
 
-### 薄荷输入法 (mint)
+### 薄荷输入法 (rime_mint)
+
+> **注意**：此处以 Mintimate/oh-my-rime 官方 upstream 当前命名为准。不同薄荷衍生包可能使用不同文件名（如早期版本使用 `mint.schema.yaml`），请先查看实际文件确认。
 
 | 文件类型 | 文件名 | 说明 |
 |---------|-------|------|
-| Schema主文件 | `mint.schema.yaml` | 主方案配置 |
-| Custom覆写 | `mint.custom.yaml` | 用户定制配置 |
+| Schema主文件 | `rime_mint.schema.yaml` | 主方案配置 |
+| Custom覆写 | `rime_mint.custom.yaml` | 用户定制配置 |
 
 **特点**：
 - 新手友好，配置简单
@@ -292,7 +306,7 @@ patch:
 
 **配置示例**：
 ```yaml
-# mint.custom.yaml - 薄荷专用配置
+# rime_mint.custom.yaml - 薄荷专用配置
 patch:
   "menu/page_size": 7
   "style/color_scheme": native
@@ -455,7 +469,7 @@ patch:
 
 # 覆写数组元素（插入到指定位置）
 patch:
-  "engine/transforms/@before 0": emoji_suggestion
+  "engine/filters/@before 0": simplifier
 
 # 删除数组元素
 patch:
@@ -497,16 +511,39 @@ patch:
 
 ## Emoji 配置 (OpenCC)
 
-### 方式一：内置 Emoji 支持
+> **重要**：Emoji 功能通过 `engine/filters` 实现，添加方式取决于方案已有的 filter 配置。常见形式为 `simplifier@emoji` 或 `simplifier@emoji_suggestion`。请先查看方案原 `*.schema.yaml` 中的 `engine/filters` 配置，再决定 patch 写法。
+
+### 方式一：在已有 simplifier filter 上添加 Emoji
+
+如果方案已有 `simplifier` filter（如雾凇、白霜），可直接追加 Emoji：
 
 ```yaml
 patch:
-  # 启用 Emoji 候选
-  'engine/transforms/@before 0': emoji_suggestion
-
-  # Emoji 匹配规则
-  'emoji_suggestion/opencc_config': emoji.json
+  # 在现有 filters 中追加 Emoji（使用 @next 在末尾添加）
+  'engine/filters/@next': simplifier@emoji
+  
+  # 或在指定位置插入
+  'engine/filters/@before 0': simplifier@emoji_suggestion
+  
+  # Emoji OpenCC 配置
+  'simplifier@emoji/opencc_config': emoji.json
+  'simplifier@emoji/tips': all
 ```
+
+### 方式二：添加新的 Emoji filter
+
+如果方案没有 Emoji filter，需完整配置：
+
+```yaml
+patch:
+  # 添加 Emoji filter 到 filters 列表
+  'engine/filters/@next': simplifier@emoji
+  
+  # Emoji 配置
+  simplifier@emoji:
+    opencc_config: emoji.json
+    option_name: emoji
+    tips: all  # 显示 Emoji 提示
 
 ### 方式二：OpenCC 繁简转换
 
@@ -594,11 +631,33 @@ patch:
 
 ## 设置语言模型
 
-### 启用语法分析
+> **推荐**：万象、雾凇、白霜、薄荷等现代方案通过 `grammar` 配置实现语法模型支持，这是当前主流方式。
+
+### 现代主流配置（推荐）
 
 ```yaml
 patch:
-  # 添加语法翻译器
+  # 语法模型配置（主流方式）
+  grammar:
+    language: grammar.bin  # 语言模型文件
+  
+  # 相关可选配置
+  grammar/collocation_max_length: 4  # 搭配词最大长度
+  grammar/collocation_min_length: 2  # 搭配词最小长度
+  
+  # 上下文建议（部分方案支持）
+  translator/contextual_suggestions: true
+  translator/max_homophones: 5  # 同音字最大数量
+  translator/max_homographs: 5  # 同形字最大数量
+```
+
+### 旧式 grammar_translator 配置（特定方案可用）
+
+> ⚠️ **注意**：以下 `grammar_translator` 配置是旧式写法，不是当前万象/雾凇/白霜/薄荷的主流 patch 方式。仅适用于特定方案或旧版本，新用户建议使用上述 `grammar/language` 配置。
+
+```yaml
+patch:
+  # 添加语法翻译器（旧式）
   'engine/translators/@next': grammar_translator
 
   # 语法分析器配置
@@ -1300,14 +1359,15 @@ patch:
     - derive/^([zcs])h/$1/
     - derive/([aei])n$/$1ng/
 
-  # Emoji
-  'engine/transforms/@before 0': emoji_suggestion
+  # Emoji（在 filters 中添加）
+  'engine/filters/@next': simplifier@emoji
+  'simplifier@emoji/opencc_config': emoji.json
 ```
 
 ### 薄荷基础定制
 
 ```yaml
-# mint.custom.yaml
+# rime_mint.custom.yaml
 patch:
   "menu/page_size": 7
   "style/color_scheme": native
