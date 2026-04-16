@@ -1,6 +1,6 @@
 ---
 name: aur-github-publish
-description: AUR GitHub 发布助手 - 自动更新 PKGBUILD 版本、发布到 GitHub 仓库并同步到 AUR。支持三种场景：版本监控更新、编译发布一体化（GitHub Action）、GoReleaser集成（aurs/aur_sources）。支持手动版本输入、自动版本检测、pkgrel bump、多架构支持（x86_64/aarch64）、deb/rpm/tar.gz 包处理。包含四种包类型命名规则（-bin/-git/无后缀/-font）。触发词：更新 AUR 包、发布到 AUR、创建 PKGBUILD、更新 Arch Linux 包、AUR 自动发布、GoReleaser AUR。
+description: AUR GitHub 发布助手 - 自动更新 PKGBUILD 版本、发布到 GitHub 仓库并同步到 AUR。支持首次发布引导（版本差异触发策略）、三种场景：版本监控更新、编译发布一体化（GitHub Action）、GoReleaser集成（aurs/aur_sources）。支持手动版本输入、自动版本检测、pkgrel bump、多架构支持（x86_64/aarch64）、deb/rpm/tar.gz 包处理。包含四种包类型命名规则（-bin/-git/无后缀/-font）。触发词：首次发布 AUR、创建新 AUR 包、更新 AUR 包、发布到 AUR、创建 PKGBUILD、更新 Arch Linux 包、AUR 自动发布、GoReleaser AUR。
 ---
 
 # AUR GitHub 发布助手
@@ -11,13 +11,14 @@ description: AUR GitHub 发布助手 - 自动更新 PKGBUILD 版本、发布到 
 
 | Document | Content |
 |----------|---------|
+| [references/initial-publish-guide.md](references/initial-publish-guide.md) | ⭐ 首次发布引导（版本差异触发策略） |
 | [references/pkgbuild-template.md](references/pkgbuild-template.md) | PKGBUILD 模板语法与结构 |
 | [references/workflow-template.md](references/workflow-template.md) | GitHub Actions workflow 模板（含真实实例） |
 | [references/aur-deploy-action.md](references/aur-deploy-action.md) | AUR 部署 action 配置 + 首次发布指南 |
 | [references/package-types.md](references/package-types.md) | 不同包类型处理 (deb/rpm/tar.gz/AppImage) |
 | [references/best-practices.md](references/best-practices.md) | 最佳实践与常见问题 |
 | [references/real-world-examples.md](references/real-world-examples.md) | 真实项目示例（含 GitHub Action 实例） |
-| [references/goreleaser-aur.md](references/goreleaser-aur.md) | GoReleaser AUR 集成（aurs/aur_sources） ⭐ |
+| [references/goreleaser-aur.md](references/goreleaser-aur.md) | GoReleaser AUR 集成（aurs/aur_sources） |
 
 ---
 
@@ -682,6 +683,123 @@ git push origin master
 
 ## 工作流程
 
+### Phase 0: 首次发布检测与引导 ⭐ 新增
+
+**输入**: 用户请求（创建新 PKGBUILD）
+**输出**: 发布方式选择 + 初始版本号策略
+
+#### Step 0.1: 检测包状态
+
+**⚠️ 关键检查点**: 确定是否首次发布
+
+```bash
+# 检查 AUR 中是否存在该包
+curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg={pkgname}" | jq -r '.resultcount'
+# 0 = 不存在（首次发布）
+# 1+ = 已存在（更新流程）
+```
+
+| 状态 | 处理方式 |
+|------|---------|
+| **已存在** | 跳过 Phase 0，进入正常更新流程（Phase 1） |
+| **不存在** | 进入首次发布引导流程 |
+
+#### Step 0.2: 引导用户选择发布方式
+
+**⚠️ 必须询问用户**:
+
+```
+询问用户：
+「检测到该包尚未在 AUR 发布，属于首次发布。
+
+有两种方式完成首次发布：
+
+【方案 A】GitHub 自动发布（推荐）
+- 自动获取最新版本，设置初始版本号（patch version 回退）
+- GitHub Action 检测版本变化后自动发布到 AUR
+- checksum 由 workflow 自动计算
+- 简单快捷，无需手动操作 AUR 仓库
+
+【方案 B】传统手动发布
+- 手动克隆 AUR 仓库
+- 创建 PKGBUILD 和 .SRCINFO
+- 手动 SSH 推送创建仓库
+- 需要熟悉 AUR 操作流程
+
+是否选择 GitHub 自动发布？」
+```
+
+#### Step 0.3: 确定初始版本号（方案 A）
+
+**获取最新版本并计算初始版本**:
+
+```bash
+# 获取上游最新版本
+LATEST_VERSION=$(curl -s https://api.github.com/repos/{owner}/{repo}/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+
+# 计算 patch version 回退（版本格式 X.Y.Z）
+# 示例：1.2.5 → 1.2.4
+INITIAL_VERSION=$(echo "$LATEST_VERSION" | awk -F. '{print $1"."$2"."$3-1}')
+```
+
+**版本回退策略**:
+
+| 版本格式 | 最新版本 | 初始版本 | 算法 |
+|---------|---------|---------|------|
+| X.Y.Z | 1.2.5 | 1.2.4 | `$3-1` |
+| YYYY.MM.DD | 2024.01.15 | 2024.01.14 | 最后部分 -1 |
+| vX.Y.Z | v1.2.5 | 1.2.4 | 去掉 v 前缀后 -1 |
+| 单数字 | 5 | 4 | 直接 -1 |
+
+**无法获取版本号时**:
+
+```
+询问用户：
+「无法自动获取上游版本号。
+
+请手动输入初始版本号：
+- 如果知道最新版本：输入最新版本减一
+- 如果不确定：输入一个明显低于预期的版本（如 0.0.1）
+
+初始版本号：」
+```
+
+#### Step 0.4: Secrets 配置检查
+
+**⚠️ 首次发布前必须确认 Secrets 已配置**:
+
+```
+询问用户：
+「首次发布需要 GitHub Secrets 配置：
+
+| Secret | 说明 |
+|--------|------|
+| AUR_USERNAME | AUR 用户名 |
+| AUR_EMAIL | AUR 邮箱 |
+| AUR_SSH_PRIVATE_KEY | AUR SSH 私钥 |
+
+SSH 公钥必须已上传到 AUR（https://aur.archlinux.org/account/）
+
+是否已配置完成？」
+```
+
+#### Step 0.5: 生成初始 PKGBUILD
+
+**使用初始版本号生成 PKGBUILD**:
+
+- `pkgver` 使用初始版本号（低于最新）
+- `sha256sums` 使用 `'SKIP'`（workflow 自动计算）
+- 提交后用户触发 workflow，自动发布最新版本
+
+**首次发布完成标志**:
+1. 提交初始 PKGBUILD 到 GitHub
+2. 用户手动触发 workflow 或等待定时触发
+3. Workflow 检测版本变化，自动更新并发布到 AUR
+
+**⚠️ 检查点**: 详细流程请参阅 [references/initial-publish-guide.md](references/initial-publish-guide.md)
+
+---
+
 ### Phase 1: 信息收集与前置检查
 
 **输入**: 用户请求（创建/更新 PKGBUILD）
@@ -855,13 +973,18 @@ git push
 
 | 场景 | 决策 |
 |------|------|
+| **首次发布检测** | **必须检查**: curl AUR RPC API 确认是否存在 |
+| **首次发布方式** | **必须询问**: 方案 A（GitHub 自动）或方案 B（手动） |
+| **初始版本号** | **自动计算**: patch version 回退（最新版本 -1） |
+| **版本号无法获取** | **询问用户**: 手动输入初始版本号 |
+| **Secrets 配置** | **首次必须**: AUR_USERNAME/AUR_EMAIL/AUR_SSH_PRIVATE_KEY |
+| **SSH 公钥上传** | **首次必须**: 已上传到 AUR 账户 |
 | **包类型判断** | **必须询问**: -bin/-git/无后缀/-font？ |
 | 用户未提供包名后缀 | **推荐**: 使用 `-bin` 后缀（预编译包最常见） |
 | AUR 包是否已存在 | **必须检查**: curl AUR API 或询问用户 |
 | checksum 是否预填 | **使用 SKIP**: workflow 通过 updpkgsums 计算 |
 | 是否需要 .install 文件 | **可选**: 有 post_install 钩子时添加 |
 | 定时更新频率 | **推荐**: 每12小时 (`0 */12 * * *`) |
-| Secrets 是否配置 | **首次提示**: 需配置 AUR_USERNAME/AUR_EMAIL/AUR_SSH_PRIVATE_KEY |
 | 字体包架构 | **使用**: `arch=('any')`（字体不依赖架构） |
 
 ---

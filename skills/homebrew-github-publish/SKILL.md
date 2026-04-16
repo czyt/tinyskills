@@ -1,6 +1,6 @@
 ---
 name: homebrew-github-publish
-description: Homebrew Tap GitHub 发布助手 - 自动更新 Casks 和 Formulas 版本并发布到 GitHub Tap 仓库。支持手动版本输入、自动版本检测、sha256 校验和计算、多架构支持（arm64/x64）。触发词：更新 Homebrew Cask、发布到 Homebrew Tap、更新 Formula 版本、创建 Homebrew 包。
+description: Homebrew Tap GitHub 发布助手 - 自动更新 Casks 和 Formulas 版本并发布到 GitHub Tap 仓库。支持首次发布引导（版本差异触发策略）、手动版本输入、自动版本检测、sha256 校验和计算、多架构支持（arm64/x64）。触发词：首次发布 Homebrew、创建新 Homebrew Cask、更新 Homebrew Cask、发布到 Homebrew Tap、更新 Formula 版本、创建 Homebrew 包。
 ---
 
 # Homebrew Tap GitHub 发布助手
@@ -11,9 +11,10 @@ description: Homebrew Tap GitHub 发布助手 - 自动更新 Casks 和 Formulas 
 
 | Document | Content |
 |----------|---------|
+| [references/initial-publish-guide.md](references/initial-publish-guide.md) | ⭐ 首次发布引导（版本差异触发策略） |
 | [references/cask-template.md](references/cask-template.md) | Cask 模板语法与结构（含 postflight xattr） |
 | [references/formula-template.md](references/formula-template.md) | Formula 模板语法与结构 |
-| [references/font-template.md](references/font-template.md) | Font Cask 模板与命名规范 ⭐ 新增 |
+| [references/font-template.md](references/font-template.md) | Font Cask 模板与命名规范 |
 | [references/workflow-template.md](references/workflow-template.md) | GitHub Actions workflow 模板 |
 | [references/version-detection.md](references/version-detection.md) | 版本检测策略 |
 | [references/best-practices.md](references/best-practices.md) | 最佳实践与常见问题 |
@@ -428,6 +429,141 @@ jobs:
 
 ## 工作流程
 
+### Phase 0: 首次发布检测与引导 ⭐ 新增
+
+**输入**: 用户请求（创建新 Cask 或 Formula）
+**输出**: 发布方式选择 + 初始版本号策略 + 软件类型确认
+
+#### Step 0.1: 检测包状态
+
+**⚠️ 关键检查点**: 确定是否首次发布
+
+```bash
+# 在 Tap 仓库中检查文件是否存在
+ls Casks/{name}.rb Formula/{name}.rb
+
+# 或使用 git 检查
+git ls-files Casks/{name}.rb Formula/{name}.rb
+```
+
+| 状态 | 处理方式 |
+|------|---------|
+| **文件不存在** | 进入首次发布引导流程 |
+| **文件已存在** | 跳过 Phase 0，进入正常更新流程（Phase 1） |
+
+#### Step 0.2: 引导用户选择发布方式
+
+**⚠️ 必须询问用户**:
+
+```
+询问用户：
+「检测到该 Cask/Formula 尚未在 Homebrew Tap 发布，属于首次发布。
+
+有两种方式完成首次发布：
+
+【方案 A】GitHub 自动发布（推荐）
+- 自动获取最新版本，设置初始版本号（patch version 回退）
+- GitHub Action 检测版本变化后自动更新发布
+- sha256 checksum 由 workflow 自动计算
+- 简单快捷，无需手动操作
+
+【方案 B】传统手动发布
+- 手动创建 Cask/Formula 文件
+- 手动计算 sha256 checksum
+- 手动运行 brew audit 验证
+- 手动提交推送
+- 需要熟悉 Homebrew 规范
+
+是否选择 GitHub 自动发布？」
+```
+
+#### Step 0.3: 确认软件类型
+
+**⚠️ 首次发布必须确认类型**:
+
+```
+询问用户：
+「请确认软件类型：
+- CLI 命令行工具 → Formula (Formula/ 目录)
+- GUI 桌面应用 → Cask (Casks/ 目录)
+- 字体文件 → Cask Font (Casks/ 目录，命名 font-{name}.rb)
+
+该软件属于哪种类型？」
+```
+
+#### Step 0.4: 确定初始版本号（方案 A）
+
+**获取最新版本并计算初始版本**:
+
+```bash
+# 获取上游最新版本
+LATEST_VERSION=$(curl -s https://api.github.com/repos/{owner}/{repo}/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+
+# 计算 patch version 回退（版本格式 X.Y.Z）
+# 示例：1.2.5 → 1.2.4
+INITIAL_VERSION=$(echo "$LATEST_VERSION" | awk -F. '{print $1"."$2"."$3-1}')
+```
+
+**版本回退策略**:
+
+| 版本格式 | 最新版本 | 初始版本 | 算法 |
+|---------|---------|---------|------|
+| X.Y.Z | 1.2.5 | 1.2.4 | `$3-1` |
+| YYYY.MM.DD | 2024.01.15 | 2024.01.14 | 最后部分 -1 |
+| vX.Y.Z | v1.2.5 | 1.2.4 | 去掉 v 前缀后 -1 |
+| 单数字 | 5 | 4 | 直接 -1 |
+
+**无法获取版本号时**:
+
+```
+询问用户：
+「无法自动获取上游版本号。
+
+请手动输入初始版本号：
+- 如果知道最新版本：输入最新版本减一
+- 如果不确定：输入一个明显低于预期的版本（如 0.0.1）
+
+初始版本号：」
+```
+
+#### Step 0.5: 确认架构支持
+
+**⚠️ 根据软件类型询问架构**:
+
+```
+询问用户（Cask）：
+「请确认架构支持：
+- arm64 + x64 → 双架构模板（on_arm/on_intel）
+- 仅 arm64 → 单架构
+- universal → 单文件（无需架构区分）
+
+支持哪些架构？」
+
+询问用户（Formula）：
+「请确认架构支持：
+- arm64 + x64 → 双架构模板（Hardware::CPU.arm?/intel?）
+- 仅 arm64 → 单架构
+
+支持哪些架构？」
+```
+
+#### Step 0.6: 生成初始 Cask/Formula
+
+**使用初始版本号生成文件**:
+
+- `version` 使用初始版本号（低于最新）
+- `sha256` 使用 `PLACEHOLDER`（workflow 自动计算）
+- 提交后用户触发 workflow，自动发布最新版本
+
+**首次发布完成标志**:
+1. 提交初始 Cask/Formula 到 GitHub
+2. 用户手动触发 workflow 或等待定时触发
+3. Workflow 检测版本变化，自动更新 checksum 并发布
+
+**⚠️ 检查点**: 详细流程请参阅 [references/initial-publish-guide.md](references/initial-publish-guide.md)
+
+---
+
 ### Phase 1: 信息收集
 
 **输入**: 用户请求（创建/更新 Cask 或 Formula）
@@ -545,12 +681,17 @@ git push
 
 | 场景 | 决策 |
 |------|------|
+| **首次发布检测** | **必须检查**: 检查文件是否存在于 Tap 仓库 |
+| **首次发布方式** | **必须询问**: 方案 A（GitHub 自动）或方案 B（手动） |
+| **初始版本号** | **自动计算**: patch version 回退（最新版本 -1） |
+| **版本号无法获取** | **询问用户**: 手动输入初始版本号 |
+| **软件类型判断** | **必须询问**: CLI/GUI/Font？ |
+| **架构支持** | **必须询问**: arm64/x64/universal？ |
 | 用户未提供架构信息 | **询问**: 「该应用支持哪些架构？arm64/x64/universal？」 |
 | 用户未提供文件格式 | **分析**: 从 GitHub Releases 页面获取文件列表 |
 | sha256 是否预填 | **使用 PLACEHOLDER**: workflow 自动计算 |
 | 是否需要 livecheck | **推荐添加**: 自动版本检测 |
 | 定时更新频率 | **推荐**: 每12小时 (`0 */12 * * *`) |
-| **类型判断** | **必须询问**: CLI/GUI/Font？ |
 | **应用是否签名** | **询问**: 未签名需添加 postflight xattr |
 | **字体命名** | **必须**: font-{name}.rb 格式 |
 | **字体仓库** | **推荐**: 独立 homebrew-fonts Tap |
