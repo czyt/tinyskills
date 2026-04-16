@@ -47,18 +47,33 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 | [schema-nodes.md](references/core/schema-nodes.md) | Schema.yaml节点详解 | 理解配置文件结构 |
 | [schema-design.md](references/core/schema-design.md) | 方案设计原理 (69KB) | 创建新方案 |
 | [spelling-algebra.md](references/core/spelling-algebra.md) | 拼写运算规则 (28KB) | 双拼/模糊音配置 |
+| [configuration.md](references/core/configuration.md) | **配置详解** ⭐ | 完整配置参考 |
 | [api-development.md](references/core/api-development.md) | librime API 开发 | 程序级扩展 |
 | [introduction.md](references/core/introduction.md) | Rime 架构原理 | 了解底层机制 |
+| [getting-started.md](references/core/getting-started.md) | 快速入门指南 | 新手入门 |
+| [faq.md](references/core/faq.md) | 常见问题解答 | 问题排查 |
+| [design-principles.md](references/core/design-principles.md) | 设计理念 | 理解设计哲学 |
+| [shared-data.md](references/core/shared-data.md) | 共享数据机制 | 多方案共享 |
 | [downloads.md](references/core/downloads.md) | 客户端下载 | 安装指引 |
+
+### 客户端集成 (core/)
+| 文档 | 内容 | 用途 |
+|------|------|------|
 | [squirrel-client.md](references/core/squirrel-client.md) | 鼠须管配置 (macOS) | macOS特定设置 |
+| [squirrel-integration.md](references/core/squirrel-integration.md) | 鼠须管集成指南 | macOS深度配置 |
 | [weasel-client.md](references/core/weasel-client.md) | 小狼毫配置 (Windows) | Windows特定设置 |
+| [weasel-integration.md](references/core/weasel-integration.md) | 小狼毫集成指南 | Windows深度配置 |
+| [ibus-integration.md](references/core/ibus-integration.md) | IBus集成 (Linux) | Linux配置 |
+| [emacs-integration.md](references/core/emacs-integration.md) | Emacs集成 | Emacs使用 |
 
 ### 定制指南 (customization/)
 | 文档 | 内容 | 用途 |
 |------|------|------|
 | [patch-guide.md](references/customization/patch-guide.md) | **Patch语法详解** ⭐ | custom.yaml 覆写 |
+| [recipes.md](references/customization/recipes.md) | 配方/食谱 ⭐ | 快速配置模板 |
 | [user-manual.md](references/customization/user-manual.md) | 用户操作手册 | 打字/选字/切换 |
 | [userdata.md](references/customization/userdata.md) | 用户数据管理 | 同步/备份/词库 |
+| [dictionary-pack.md](references/customization/dictionary-pack.md) | 词库打包 | 词库制作发布 |
 | [mood-collection.md](references/customization/mood-collection.md) | 懂我心意体验 | 输入体验优化 |
 
 ### 方案详解 (schemes/)
@@ -72,9 +87,9 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 | [combopinyin.md](references/schemes/combopinyin.md) | 宫保拼音专题 | 并击输入 |
 
 ### 原始抓取 (scraped/)
-19个原始文档 (664KB)，包含上述所有内容的未整理版本。
+31个原始文档 (~800KB)，包含上述所有内容的未整理版本。
 
-> 📖 **使用策略**：优先查 `rime-knowledge-base.md` 获取摘要，需要深入时查阅分类目录。AI编写配置工具时，应先读 `customization/patch-guide.md` 理解Patch语法。
+> 📖 **使用策略**：优先查 `rime-knowledge-base.md` 获取摘要，需要深入时查阅分类目录。AI编写配置工具时，应先读 `customization/patch-guide.md` 理解Patch语法，查阅 `customization/recipes.md` 获取配置模板。
 
 ---
 
@@ -91,7 +106,15 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 
 ---
 
-## 配置工作流
+## 配置工作流 ⚠️
+
+> 🛑 **入口检查点（需求确认）**：开始配置前，先了解用户需求：
+> - "您是首次配置还是修改现有配置？"
+> - "您需要配置什么功能？（候选词数量、模糊拼音、Emoji、Lua扩展等）"
+> - 根据需求快速定位：
+>   - 基础设置（候选词/外观）→ Step 3 直接配置
+>   - 功能配置（模糊音/Emoji）→ 查阅对应章节
+>   - 高级扩展（Lua/词库）→ 先确认方案兼容性
 
 ### Step 1: 确定方案 ⚠️
 
@@ -109,7 +132,14 @@ description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoj
 | "朙月" | luna_pinyin | `luna_pinyin.custom.yaml` |
 | "双拼" | double_pinyin | `double_pinyin.custom.yaml` |
 
-> 🛑 **检查点**：确认方案后再继续。不确定时问用户："您用的是哪个方案？雾凇、白霜、薄荷还是万象？"
+> 🛑 **检查点（方案确认）**：确认方案后再继续。不确定时问用户：
+> - "您用的是哪个方案？雾凇、白霜、薄荷还是万象？"
+> - 如果用户不知道方案名，询问："您是刚安装还是已配置？刚安装请查看当前使用的配置文件名。"
+> - 提供决策辅助：
+>   - 需要丰富词库+Emoji → 雾凇
+>   - 需要纯净+墨奇辅码 → 白霜
+>   - 新手入门+简单配置 → 薄荷
+>   - 繁简混输+高级定制 → 万象
 
 ---
 
@@ -270,7 +300,12 @@ patch:
 
 ---
 
-### 方案配置冲突处理
+### 方案配置冲突处理 ⚠️
+
+> 🛑 **检查点（冲突确认）**：涉及多方案或方案切换时，先确认：
+> - "您是要切换方案还是在现有方案上配置？"
+> - 切换方案 → 提醒可能需要重新配置 custom.yaml
+> - 配置现有方案 → 确认文件名匹配方案名
 
 ⚠️ **多方案共存时的注意事项**：
 
@@ -314,10 +349,16 @@ patch:
 | Android | 同文/fcitx5 | `/rime` 或 `.../data/rime` |
 | iOS | 仓输入法 | 应用内文件管理 |
 
-### Step 3: 创建/修改 custom.yaml
+### Step 3: 创建/修改 custom.yaml ⚠️
 
 **输入**：方案名、用户需求
 **输出**：custom.yaml 配置内容
+
+> 🛑 **检查点（备份确认）**：修改现有配置前，先询问用户：
+> - "您是否已有 custom.yaml 文件？如有，建议先备份。"
+> - "这是首次配置还是修改现有配置？"
+> - 首次配置 → 直接生成配置文件
+> - 修改现有 → 先读取现有配置，确认修改位置
 
 ```yaml
 # 示例：rime_ice.custom.yaml
@@ -325,12 +366,17 @@ patch:
   "menu/page_size": 9  # 候选词数量
 ```
 
-> 🛑 **检查点**：复杂配置前，先向用户展示配置预览，确认："这个配置符合您的需求吗？"
+> 🛑 **检查点（配置预览）**：复杂配置前，先向用户展示完整配置预览，确认："这个配置符合您的需求吗？修改后需要重新部署才能生效。"
 
-### Step 4: 部署生效
+### Step 4: 部署生效 ⚠️
 
 **输入**：配置文件已修改
 **输出**：部署成功确认
+
+> 🛑 **检查点（部署确认）**：部署前确认：
+> - "配置文件已保存，现在可以部署。是否继续？"
+> - 提示用户：部署可能需要几秒钟，期间输入法不可用
+> - 如有多个方案切换，提醒用户"部署后会切换到默认方案"
 
 修改后需要重新部署：
 1. 右键托盘图标
@@ -589,7 +635,12 @@ patch:
 
 ---
 
-## Lua 功能扩展
+## Lua 功能扩展 ⚠️
+
+> 🛑 **检查点（Lua调试提醒）**：启用Lua扩展前，确认：
+> - "Lua脚本出错会导致输入法崩溃，建议先在测试环境验证。"
+> - "Lua文件修改后也需要重新部署才能生效。"
+> - 提供调试方法：查看日志中的Lua错误信息
 
 ### lua_filter（候选过滤）
 
@@ -724,7 +775,13 @@ patch:
 
 ---
 
-## 第三方词库导入
+## 第三方词库导入 ⚠️
+
+> 🛑 **检查点（词库兼容性）**：导入词库前，确认：
+> - "词库文件编码必须是UTF-8(no BOM)，格式需与方案匹配。"
+> - "不同方案的词库格式不同，雾凇词库不能直接用于朙月方案。"
+> - "导入前建议先备份现有词库。"
+> - 询问用户："您要导入的词库是哪个方案的？是否确认格式兼容？"
 
 ### 词库文件格式
 

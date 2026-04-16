@@ -9,3 +9,4 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-04-16T11:30	advanced-topics	rime-custom	85.0	88.0	keep	Lua进阶+调试	万象Lua特色、词库导入、调试排查	dry_run
 2026-04-16T12:00	round2-baseline	rime-custom	88.0	76.0	baseline	-	基线评估（8维度）	dry_run
 2026-04-16T12:10	capability-boundary	rime-custom	76.0	77.75	keep	能力边界说明	添加skill能力边界说明，明确不提供脚本	dry_run
+2026-04-16T10:48	darwin-8dim	rime-custom	-	68.1	baseline	-	8维度基线评估(检查点3.5/工作流7.5/边界6/架构9)	dry_run
