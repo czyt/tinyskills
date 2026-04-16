@@ -1,3 +1,5 @@
 timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-04-16T09:30	7c4c47e	rime-custom	-	88.8	baseline	-	初始创建基线评估	dry_run
 2026-04-16T09:35	round1	rime-custom	88.8	90.0	keep	MCP工具调用示例	添加MCP工具调用示例和使用场景细化	dry_run
+2026-04-16T10:15	firecrawl	rime-custom	90.0	-	fetch	-	抓取官方Wiki/雾凇/万象/白霜文档	dry_run
+2026-04-16T10:30	darwin-round1	rime-custom	69.9	79.5	keep	检查点+边界条件	增加检查点、异常处理、辅助码系统、快速速查表	dry_run

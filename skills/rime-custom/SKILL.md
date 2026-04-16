@@ -1,6 +1,6 @@
 ---
 name: rime-custom
-description: Rime 输入法配置定制助手，支持 custom.yaml 覆写、Emoji/OpenCC 配置、模糊拼音、语言模型、符号输入、Lua 扩展、快捷键、个性化定制、多设备同步。覆盖主流方案：雾凇(rime-ice)、白霜、薄荷、万象。触发词：Rime 配置、小狼毫定制、鼠须管配置、输入法个性化、custom.yaml 覆写。
+description: Rime 输入法配置定制助手。支持 custom.yaml 覆写、Emoji/OpenCC、模糊拼音、Lua 扩展、多设备同步。覆盖雾凇/白霜/薄荷/万象方案。触发词：Rime配置、小狼毫、鼠须管、custom.yaml、模糊拼音、辅助码。
 ---
 
 # Rime 输入法配置定制助手
@@ -39,11 +39,37 @@ description: Rime 输入法配置定制助手，支持 custom.yaml 覆写、Emoj
 
 ---
 
-## Reference Documents
+## 参考文档体系
 
-| Document | Content |
-|----------|---------|
-| [references/advanced-config.md](references/advanced-config.md) | Schema 结构详解、Engine 组件、方案特色配置 ⭐ |
+### 核心知识 (core/)
+| 文档 | 内容 | 用途 |
+|------|------|------|
+| [schema-nodes.md](references/core/schema-nodes.md) | Schema.yaml节点详解 | 理解配置文件结构 |
+| [schema-design.md](references/core/schema-design.md) | 方案设计原理 (69KB) | 创建新方案 |
+| [spelling-algebra.md](references/core/spelling-algebra.md) | 拼写运算规则 (28KB) | 双拼/模糊音配置 |
+| [api-development.md](references/core/api-development.md) | librime API 开发 | 程序级扩展 |
+| [introduction.md](references/core/introduction.md) | Rime 架构原理 | 了解底层机制 |
+| [downloads.md](references/core/downloads.md) | 客户端下载 | 安装指引 |
+
+### 定制指南 (customization/)
+| 文档 | 内容 | 用途 |
+|------|------|------|
+| [patch-guide.md](references/customization/patch-guide.md) | **Patch语法详解** ⭐ | custom.yaml 覆写 |
+| [user-manual.md](references/customization/user-manual.md) | 用户操作手册 | 打字/选字/切换 |
+| [userdata.md](references/customization/userdata.md) | 用户数据管理 | 同步/备份/词库 |
+
+### 方案详解 (schemes/)
+| 文档 | 内容 | 用途 |
+|------|------|------|
+| [rime-ice.md](references/schemes/rime-ice.md) | 雾凇词库设计 (42KB) | 简体拼音配置 |
+| [rime-wanxiang.md](references/schemes/rime-wanxiang.md) | 万象完整文档 (94KB) | 辅助码/语法模型 |
+| [rime-frost.md](references/schemes/rime-frost.md) | 白霜词频优化 (32KB) | 墨奇辅助码 |
+| [combopinyin.md](references/schemes/combopinyin.md) | 宫保拼音专题 | 并击输入 |
+
+### 原始抓取 (scraped/)
+14个原始文档 (544KB, 12000行)，包含上述所有内容的未整理版本。
+
+> 📖 **使用策略**：优先查 `rime-knowledge-base.md` 获取摘要，需要深入时查阅分类目录。AI编写配置工具时，应先读 `customization/patch-guide.md` 理解Patch语法。
 
 ---
 
@@ -51,14 +77,39 @@ description: Rime 输入法配置定制助手，支持 custom.yaml 覆写、Emoj
 
 | 方案 | 特点 | 配置文件 | 适用场景 |
 |------|------|---------|---------|
-| **雾凇 (rime-ice)** | 简体拼音、词库丰富、支持 Emoji | `rime_ice.schema.yaml` | 日常输入、简体用户 |
-| **白霜** | 简体拼音、纯净、无冗余 | `baishuang.schema.yaml` | 极简风格 |
-| **薄荷** | 简体拼音、新手友好、配置简单 | `mint.schema.yaml` | 新手入门 |
-| **万象** | 繁简混输、多语言支持 | `wanxiang.schema.yaml` | 繁体用户、多语言 |
+| **雾凇 (rime-ice)** | 简体拼音、词库丰富(100万+)、Emoji、拆字反查 | `rime_ice.schema.yaml` | 日常输入、简体用户 |
+| **白霜 (rime-frost)** | 词频优化(745M语料)、纯净、墨奇辅助码 | `rime_frost.schema.yaml` | 极简风格、辅助码爱好者 |
+| **薄荷 (mint)** | 简体拼音、新手友好、MCP知识库 | `mint.schema.yaml` | 新手入门 |
+| **万象 (wanxiang)** | 繁简混输、语法模型、7种辅助码 | `wanxiang.schema.yaml` | 繁体用户、高级定制 |
+
+> 🔍 选择建议：日常用雾凇/白霜，繁体用万象，新手用薄荷。
 
 ---
 
-## 配置目录
+## 配置工作流
+
+### Step 1: 确定方案 ⚠️
+
+**输入**：用户描述需求或提及方案名
+**输出**：确定方案类型，对应 custom.yaml 文件名
+
+询问用户使用的输入方案：
+
+| 用户提及 | 方案 | custom.yaml 文件 |
+|---------|------|-----------------|
+| "雾凇/冰/雪" | rime-ice | `rime_ice.custom.yaml` |
+| "白霜/霜/纯净" | rime-frost | `rime_frost.custom.yaml` |
+| "薄荷/Mint" | mint | `mint.custom.yaml` |
+| "万象" | wanxiang | `wanxiang.custom.yaml` |
+| "朙月" | luna_pinyin | `luna_pinyin.custom.yaml` |
+| "双拼" | double_pinyin | `double_pinyin.custom.yaml` |
+
+> 🛑 **检查点**：确认方案后再继续。不确定时问用户："您用的是哪个方案？雾凇、白霜、薄荷还是万象？"
+
+### Step 2: 确认配置目录
+
+**输入**：用户操作系统
+**输出**：配置目录路径
 
 | 平台 | 客户端 | 配置目录 |
 |------|-------|---------|
@@ -66,24 +117,13 @@ description: Rime 输入法配置定制助手，支持 custom.yaml 覆写、Emoj
 | macOS | 鼠须管 | `~/Library/Rime/` |
 | Linux (IBus) | 中州韵 | `~/.config/ibus/rime/` |
 | Linux (Fcitx5) | 中州韵 | `~/.local/share/fcitx5/rime/` |
+| Android | 同文/fcitx5 | `/rime` 或 `.../data/rime` |
+| iOS | 仓输入法 | 应用内文件管理 |
 
----
+### Step 3: 创建/修改 custom.yaml
 
-## 配置工作流
-
-### Step 1: 确定方案
-
-询问用户使用的输入方案：
-- 雾凇（rime-ice）→ `rime_ice.custom.yaml`
-- 白霜 → `baishuang.custom.yaml`
-- 薄荷 → `mint.custom.yaml`
-- 万象 → `wanxiang.custom.yaml`
-- 朙月拼音 → `luna_pinyin.custom.yaml`
-- 双拼 → `double_pinyin.custom.yaml`
-
-### Step 2: 创建 custom.yaml
-
-在配置目录创建 `方案名.custom.yaml`，使用 `patch:` 节点覆写配置：
+**输入**：方案名、用户需求
+**输出**：custom.yaml 配置内容
 
 ```yaml
 # 示例：rime_ice.custom.yaml
@@ -91,12 +131,25 @@ patch:
   "menu/page_size": 9  # 候选词数量
 ```
 
-### Step 3: 部署生效
+> 🛑 **检查点**：复杂配置前，先向用户展示配置预览，确认："这个配置符合您的需求吗？"
+
+### Step 4: 部署生效
+
+**输入**：配置文件已修改
+**输出**：部署成功确认
 
 修改后需要重新部署：
 1. 右键托盘图标
 2. 选择「重新部署」或「部署」
 3. 等待编译完成
+
+**异常处理**：
+- 部署失败 → 检查 YAML 语法（空格缩进，不用 Tab）
+- 候选未变化 → 确认 custom.yaml 在正确目录
+- 日志报错 → 查看日志定位问题：
+  - Windows: `%TEMP%\rime.*.log`
+  - macOS: `$TMPDIR/rime.squirrel.*`
+  - Linux: `/tmp/rime.ibus.*`
 
 ---
 
@@ -419,6 +472,101 @@ patch:
 
 ---
 
+## 辅助码系统（万象/白霜）
+
+万象拼音和白霜拼音支持辅助码，通过部首或字形快速筛选候选。
+
+### 墨奇辅助码（白霜）
+
+触发方式：按 `` ` ``（Tab上方的键）开启辅助码模式
+
+```yaml
+# 白霜辅助码启用（方案已内置）
+patch:
+  # 无需额外配置，直接使用
+```
+
+**使用示例**：
+- 输入 `ni` → 候选"你、尼、拟..."
+- 按 `` ` `` 再按 `r`（人字旁）→ 精选带"人"的字
+- 按 `` `re`` → 更精准筛选
+
+### 万象辅助码（PRO版）
+
+万象支持 7 种辅助码：墨奇码、鹤形、自然码、虎码、五笔、汉心、首右
+
+**直接辅助码**（双拼+辅码）：
+- 示例：`vfj` = `vf`(镇的双拼) + `j`(金字旁声母)
+- 聚拢：末尾加 `/` 强制单字优先，如 `vfj/`
+
+**间接辅助码**（拼音/辅码）：
+- 示例：`ni/re` = "你"字拼音 + 辅码
+- 不干扰整句切分
+
+**声调辅助**（万象特色）：
+- `7890` 代表 `1234` 声
+- 示例：`ni9` → 第一声，`ni0` → 第四声
+
+```yaml
+# 万象辅助码配置（PRO版）
+patch:
+  wanxiang_lookup:
+    tags: [abc]
+    key: "`"
+    lookup: [wanxiang_reverse]
+    data_source: [aux, db]  # aux=词库辅码, db=反查库
+```
+
+### 辅码切换指令（万象）
+
+在输入状态输入 `/` 指令切换方案：
+
+```
+/flypy   → 小鹤双拼
+/mspy    → 微软双拼  
+/zrm     → 自然码
+/sogou   → 搜狗双拼
+/pinyin  → 全拼
+```
+
+切换后需**重新部署**生效。
+
+---
+
+## 语法模型（万象）
+
+万象支持 kenlm 语法模型，提升整句预测准确度。
+
+### 安装方法
+
+1. 下载语法模型文件（`grammar.bin`）
+2. 放置于 Rime 用户文件夹根目录
+3. 无需额外配置，自动加载
+
+**Android 注意事项**：
+- Fcitx5 数据在系统 `/data` 目录
+- 使用输入法自带"导入文件"功能
+- 直接复制可能导致权限错误
+
+---
+
+## 快速功能速查
+
+| 需求 | 方案 | 触发方式 |
+|------|------|---------|
+| Emoji | 雾凇/万象 | 自动或 `emoji_suggestion` |
+| 拆字反查 | 雾凇 | `uU` + 拼音 |
+| 辅助码 | 白霜/万象 | `` ` `` + 辅码 |
+| Unicode | 全方案 | `U` + 码位（如 `U62fc`=拼） |
+| 数字大写 | 全方案 | `R` + 数字 |
+| 农历 | 雾凇/万象 | `N` + 8位数字 |
+| 计算器 | 雾凇 | `cC` + 算式 / 万象 `V` + 算式 |
+| 特殊符号 | 雾凇 | `v` + 缩写 / 万象 `/sx` |
+| 日期时间 | 白霜 | `rq` `sj` `xq` / 万象 `/rq` `/sj` |
+| 方案切换 | 万象 | `/flypy` `/mspy` 等 |
+
+---
+
 ## 输入法快捷键
 
 ### 常用快捷键配置
@@ -620,10 +768,11 @@ patch:
 
 | 来源 | 链接 |
 |------|------|
-| 官方文档 | https://rime.im/docs/ |
-| 薄荷输入法 | https://www.mintimate.cc |
+| 官方Wiki | https://github.com/rime/home/wiki |
+| Schema配置详解 | https://github.com/LEOYoon-Tsaw/Rime_collections |
 | 雾凇拼音 | https://github.com/iDvel/rime-ice |
-| 白霜拼音 | https://github.com/gaboolic/rime-baishuang |
+| 白霜拼音 | https://github.com/gaboolic/rime-frost |
 | 万象拼音 | https://github.com/amzxyz/rime-wanxiang |
+| 薄荷输入法 | https://www.mintimate.cc |
 
-更多配置细节可通过 MCP 工具 `query_oh-my-rime` 查询薄荷输入法知识库。
+更多配置细节可通过 MCP 工具 `query_oh-my-rime` 查询薄荷输入法知识库，或查阅 references/rime-knowledge-base.md。
