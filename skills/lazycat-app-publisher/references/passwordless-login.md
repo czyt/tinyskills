@@ -80,10 +80,10 @@ application:
       do:
         - src: builtin://simple-inject-password
           params:
-            # 从部署参数渲染得到固定用户名
-            user: "{{ index .U \"login_user\" }}"
-            # 从部署参数渲染得到随机初始密码
-            password: "{{ index .U \"login_password\" }}"
+            # 简单字段名使用点语法：{{ .U.xxx }}
+            # 仅当字段名包含特殊字符（如 "."）时才使用 index 语法
+            user: "{{ .U.login_user }}"
+            password: "{{ .U.login_password }}"
 ```
 
 ### 验证
@@ -354,8 +354,9 @@ application:
       do:
         - src: builtin://simple-inject-password
           params:
-            user: "{{ index .U \"admin_user\" }}"
-            password: "{{ index .U \"admin_password\" }}"
+            # 简单字段名使用点语法
+            user: "{{ .U.admin_user }}"
+            password: "{{ .U.admin_password }}"
             userSelector: "#user_login"
             passwordSelector: "#user_pass"
 ```

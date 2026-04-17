@@ -93,8 +93,10 @@ application:
       do:
         - src: builtin://simple-inject-password
           params:
-            user: "{{ index .U \"login_user\" }}"
-            password: "{{ index .U \"login_password\" }}"
+            # 简单字段名使用点语法：{{ .U.xxx }}
+            # 仅当字段名包含特殊字符（如 "."）时才使用 index 语法
+            user: "{{ .U.login_user }}"
+            password: "{{ .U.login_password }}"
 
     # request 阶段：注入 Basic Auth
     - id: inject-basic-auth-header

@@ -390,6 +390,29 @@ def classify_service(service_config):
 | 运行时变量 | `${LAZYCAT_*}` | `${LAZYCAT_APP_ID}` |
 | 条件渲染 | `{{if}}/{{else}}/{{end}}` | 根据参数动态配置 |
 
+#### ⚠️ 模板语法规范（重要）
+
+**字段名包含特殊字符时必须使用 `index` 语法，否则使用点语法：**
+
+```yaml
+# ✅ 正确：简单字段名（无特殊字符）使用点语法
+{{ .U.login_user }}
+{{ .U.target }}
+{{ .INTERNAL.db_password }}
+
+# ✅ 正确：字段名包含 "." 等特殊字符时使用 index 语法
+{{ index .U "listen.port" }}
+{{ index .U "api.endpoint" }}
+
+# ❌ 错误：简单字段名不应该使用 index 语法
+{{ index .U "login_user" }}  # ❌ 应改为 {{ .U.login_user }}
+{{ index .U "target" }}      # ❌ 应改为 {{ .U.target }}
+```
+
+**规则总结：**
+- 字段名不含 `.` → 使用 `{{ .U.xxx }}` 点语法
+- 字段名含 `.` → 使用 `{{ index .U "xxx" }}` index 语法
+
 详见 [references/intelligent-analysis.md](references/intelligent-analysis.md) 和 **[references/go-template-conditional.md](references/go-template-conditional.md)** ⭐
 
 ### Setup Wizard 约束
@@ -584,8 +607,10 @@ application:
       do:
         - src: builtin://simple-inject-password
           params:
-            user: "{{ index .U \"login_user\" }}"
-            password: "{{ index .U \"login_password\" }}"
+            # 简单字段名使用点语法：{{ .U.xxx }}
+            # 仅当字段名包含特殊字符（如 "."）时才使用 index 语法
+            user: "{{ .U.login_user }}"
+            password: "{{ .U.login_password }}"
 ```
 
 #### 方案二：三阶段联动（高级场景）
@@ -702,8 +727,10 @@ application:
       do:
         - src: builtin://simple-inject-password
           params:
-            user: "{{ index .U \"login_user\" }}"
-            password: "{{ index .U \"login_password\" }}"
+            # 简单字段名使用点语法：{{ .U.xxx }}
+            # 仅当字段名包含特殊字符（如 "."）时才使用 index 语法
+            user: "{{ .U.login_user }}"
+            password: "{{ .U.login_password }}"
 
 services:
   postgres:

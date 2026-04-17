@@ -1,41 +1,17 @@
-{
-  "skill_name": "lazycat-app-publisher",
-  "evals": [
-    {
-      "id": 1,
-      "name": "simple-web-app",
-      "prompt": "把下面这个 docker-compose.yml 转换成 LazyCat LPK v2 格式：\n\nservices:\n  web:\n    image: nginx:latest\n    ports:\n      - \"80:80\"\n    volumes:\n      - ./html:/usr/share/nginx/html",
-      "expected": "生成 package.yml + lzc-manifest.yml + lzc-build.yml，包含 upstreams 配置，volume 映射到 /lzcapp/var"
-    },
-    {
-      "id": 2,
-      "name": "multi-service-with-db",
-      "prompt": "转换这个有数据库的多服务 docker-compose：\n\nservices:\n  postgres:\n    image: postgres:15\n    environment:\n      POSTGRES_PASSWORD: mypassword\n    healthcheck:\n      test: [\"CMD-SHELL\", \"pg_isready -U postgres\"]\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n\n  app:\n    image: myapp:latest\n    environment:\n      DATABASE_URL: postgresql://postgres:mypassword@postgres:5432/app\n    depends_on:\n      - postgres\n    ports:\n      - \"3000:3000\"",
-      "expected": "正确识别 postgres 为 Internal 服务，使用 {{.INTERNAL.db_password}}，生成免密登录配置（如果 app 有密码体系）"
-    },
-    {
-      "id": 3,
-      "name": "github-author-extraction",
-      "prompt": "创建一个 LazyCat 应用，homepage 是 https://github.com/louislam/uptime-kuma，应用名是 Uptime Kuma",
-      "expected": "package.yml 中 author 字段自动填入 'louislam'（从 GitHub URL 提取）"
-    },
-    {
-      "id": 4,
-      "name": "docker-run-conversion",
-      "prompt": "把这个 docker run 命令转成 LazyCat 格式：\ndocker run -d -p 8080:80 -e API_KEY=secret123 -v /data:/app/data --name myweb nginx:latest",
-      "expected": "解析 -p/-e/-v/--name，生成对应的 upstreams、environment、binds、subdomain 配置"
-    },
-    {
-      "id": 5,
-      "name": "password-app-check",
-      "prompt": "转换这个有密码的应用：\n\nservices:\n  admin-panel:\n    image: admin-panel:latest\n    environment:\n      ADMIN_PASSWORD: ${ADMIN_PASS}\n      SECRET_KEY: ${SECRET}\n    ports:\n      - \"80:80\"",
-      "expected": "检测到密码体系，询问用户免密登录方案，生成 injects 配置"
-    },
-    {
-      "id": 6,
-      "name": "multi-entry-points",
-      "prompt": "我正在为一个博客系统创建 LazyCat 应用，需要有主博客入口（路径 /）和管理后台入口（路径 /admin），应用名是 myblog，请帮我配置多入口",
-      "expected": "生成包含 application.entries 的 manifest，正确设置 min_os_version: 1.4.3，并提供 locales 多语言配置示例"
-    }
-  ]
-}
+[
+  {
+    "id": 1,
+    "prompt": "将这个 docker-compose.yml 转换为 LazyCat LPK v2 格式，应用有登录页面需要配置免密登录：\nservices:\n  web:\n    image: nginx:latest\n    ports:\n      - \"80:80\"\n    environment:\n      - ADMIN_USER=admin\n      - ADMIN_PASSWORD=secret123\n",
+    "expected": "生成的 injects 配置中，user 和 password 参数应使用 {{ .U.admin_user }} 和 {{ .U.admin_password }} 点语法，而非 index 语法"
+  },
+  {
+    "id": 2,
+    "prompt": "帮我为这个应用创建 lzc-deploy-params.yml，有两个参数：listen.port（监听端口）和 target（目标地址）",
+    "expected": "在 lzc-manifest.yml 的模板渲染中，listen.port 应使用 {{ index .U \"listen.port\" }}，target 应使用 {{ .U.target }}"
+  },
+  {
+    "id": 3,
+    "prompt": "检查这个免密登录配置是否正确：\napplication:\n  injects:\n    - id: login-autofill\n      when:\n        - /login\n      do:\n        - src: builtin://simple-inject-password\n          params:\n            user: \"{{ index .U \\\"login_user\\\" }}\"\n            password: \"{{ index .U \\\"login_password\\\" }}\"",
+    "expected": "应指出 login_user 和 login_password 是简单字段名，不应使用 index 语法，建议改为 {{ .U.login_user }} 和 {{ .U.login_password }}"
+  }
+]
