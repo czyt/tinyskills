@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我创建一个便携式的 Go 项目，需要单文件部署，前端嵌入，使用 SQLite 数据库，项目名叫 myapp，放在当前目录",
+    "expected": "创建完整的项目结构，包含 cmd/app/main.go（embed配置）、ent schema、internal各层目录、web目录、Dockerfile等"
+  },
+  {
+    "id": 2,
+    "prompt": "我有一个 Go 项目使用 ent 和 SQLite，需要配置 entsqlite 驱动实现无 CGO 交叉编译，数据库连接参数要优化并发性能",
+    "expected": "提供完整的 entsqlite 配置代码，包含正确的驱动名称sqlite3和WAL模式连接参数"
+  },
+  {
+    "id": 3,
+    "prompt": "帮我把现有的 Go 后端项目改造为单文件部署，前端是 Vue 项目在 web/ 目录，需要配置 embed 和构建脚本",
+    "expected": "提供 embed 配置代码、前端构建流程、后端构建命令（含-tags embed）、交叉编译示例"
+  },
+  {
+    "id": 4,
+    "prompt": "Go portable app 的 ent schema 测试怎么写？需要使用 entsqlite 内存数据库",
+    "expected": "提供使用 enttest 的测试代码示例，包含正确的 sqlite3 驱动名称和内存数据库配置"
+  },
+  {
+    "id": 5,
+    "prompt": "便携式 Go 应用如何配置 Dockerfile 实现单文件部署？需要嵌入前端产物",
+    "expected": "提供完整的多阶段 Dockerfile，包含前端构建、embed配置、CGO_ENABLED=0构建"
+  }
+]
