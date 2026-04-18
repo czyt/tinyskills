@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get latest version
         id: get_version
@@ -89,7 +89,7 @@ jobs:
 
       - name: Publish to AUR
         if: steps.compare.outputs.needs_update == 'true'
-        uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
         with:
           pkgname: {pkgname}
           pkgbuild: ./{pkgname}/PKGBUILD
@@ -147,7 +147,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get latest version
         id: get_version
@@ -212,7 +212,7 @@ jobs:
 
       - name: Publish to AUR
         if: steps.compare.outputs.needs_update == 'true'
-        uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
         with:
           pkgname: autocli-bin
           pkgbuild: ./autocli-bin/PKGBUILD
@@ -352,3 +352,35 @@ sed -i "s|v[0-9.]*-|v${NEW_VERSION}-|g" PKGBUILD
 - [KSXGitHub/github-actions-deploy-aur](https://github.com/KSXGitHub/github-actions-deploy-aur)
 - [GitHub Actions 文档](https://docs.github.com/en/actions)
 - [AUR 提交指南](https://wiki.archlinux.org/title/AUR_submission_guidelines)
+
+---
+
+## ⚠️ GitHub Actions 版本检查
+
+**在使用本模板之前，请检查以下 GitHub Actions 的最新版本**：
+
+```bash
+# 检查 actions/checkout 最新版本
+curl -s https://api.github.com/repos/actions/checkout/releases/latest | jq -r '.tag_name'
+
+# 检查 KSXGitHub/github-actions-deploy-aur 最新版本
+curl -s https://api.github.com/repos/KSXGitHub/github-actions-deploy-aur/releases/latest | jq -r '.tag_name'
+
+# 检查 actions/setup-go 最新版本
+curl -s https://api.github.com/repos/actions/setup-go/releases/latest | jq -r '.tag_name'
+
+# 检查 goreleaser/goreleaser-action 最新版本
+curl -s https://api.github.com/repos/goreleaser/goreleaser-action/releases/latest | jq -r '.tag_name'
+```
+
+| Action | 当前模板版本 | 检查最新 |
+|--------|-------------|---------|
+| `actions/checkout` | v6 | [releases](https://github.com/actions/checkout/releases) |
+| `KSXGitHub/github-actions-deploy-aur` | v4.1.3 | [releases](https://github.com/KSXGitHub/github-actions-deploy-aur/releases) |
+| `actions/setup-go` | v6 | [releases](https://github.com/actions/setup-go/releases) |
+| `goreleaser/goreleaser-action` | v7 | [releases](https://github.com/goreleaser/goreleaser-action/releases) |
+| `softprops/action-gh-release` | v3 | [releases](https://github.com/softprops/action-gh-release/releases) |
+| `actions/upload-artifact` | v7 | [releases](https://github.com/actions/upload-artifact/releases) |
+| `actions/download-artifact` | v8 | [releases](https://github.com/actions/download-artifact/releases) |
+
+**最佳实践**: 每次创建新 workflow 时，先检查上述 Actions 是否有新版本发布，使用最新版本可以获得更好的性能和安全性。

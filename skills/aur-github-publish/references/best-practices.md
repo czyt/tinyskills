@@ -38,7 +38,7 @@ pkgname=myapp      # ❌ 错误（源码包使用）
 
 ```yaml
 - name: Publish to AUR
-  uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+  uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
   with:
     updpkgsums: true  # ✅ 推荐
 ```

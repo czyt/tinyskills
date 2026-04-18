@@ -232,7 +232,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       
       - uses: ariga/setup-atlas@v0
       

@@ -189,7 +189,7 @@ curl -s https://api.github.com/repos/{owner}/{repo}/releases/latest | jq -r '.ta
 
 ```yaml
 - name: Publish to AUR
-  uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+  uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
   with:
     updpkgsums: true  # ✅ 自动计算 checksum
 ```
@@ -216,7 +216,7 @@ sed -i "s/^pkgrel=.*/pkgrel=$NEW_REL/" PKGBUILD
 
 ```yaml
 - name: Publish to AUR
-  uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+  uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
   with:
     pkgname: {pkgname}
     pkgbuild: ./{pkgname}/PKGBUILD
@@ -326,7 +326,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get latest version
         id: get_version
@@ -383,7 +383,7 @@ jobs:
 
       - name: Publish to AUR
         if: steps.compare.outputs.needs_update == 'true'
-        uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
         with:
           pkgname: {pkgname}
           pkgbuild: ./{pkgname}/PKGBUILD
@@ -440,9 +440,9 @@ jobs:
             goarch: arm64
             output: myapp-darwin-arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v6
         with:
           go-version: stable
       
@@ -454,7 +454,7 @@ jobs:
           go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
             -o dist/${{ matrix.output }}
       
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.output }}
           path: dist/${{ matrix.output }}
@@ -464,15 +464,15 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist/
           merge-multiple: true
       
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
         env:
@@ -483,7 +483,7 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Extract version
         id: version
@@ -496,7 +496,7 @@ jobs:
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
       
       - name: Publish to AUR
-        uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
         with:
           pkgname: {pkgname}
           pkgbuild: ./{pkgname}/PKGBUILD
@@ -597,15 +597,15 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v6
         with:
           go-version: stable
       
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"

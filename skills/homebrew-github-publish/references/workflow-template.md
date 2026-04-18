@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get latest version
         id: version_check
@@ -112,7 +112,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get latest version
         id: version_check
@@ -221,7 +221,7 @@ on:
 
 ```yaml
 - name: Create Pull Request
-  uses: peter-evans/create-pull-request@v5
+  uses: peter-evans/create-pull-request@v8
   with:
     title: "Update {AppName} to version ${{ steps.version_check.outputs.new_version }}"
     body: |
@@ -236,3 +236,24 @@ on:
 
 - [GitHub Actions 文档](https://docs.github.com/en/actions)
 - [peter-evans/create-pull-request](https://github.com/peter-evans/create-pull-request)
+
+---
+
+## ⚠️ GitHub Actions 版本检查
+
+**在使用本模板之前，请检查以下 GitHub Actions 的最新版本**：
+
+```bash
+# 检查 actions/checkout 最新版本
+curl -s https://api.github.com/repos/actions/checkout/releases/latest | jq -r '.tag_name'
+
+# 检查 peter-evans/create-pull-request 最新版本
+curl -s https://api.github.com/repos/peter-evans/create-pull-request/releases/latest | jq -r '.tag_name'
+```
+
+| Action | 当前模板版本 | 检查最新 |
+|--------|-------------|---------|
+| `actions/checkout` | v6 | [releases](https://github.com/actions/checkout/releases) |
+| `peter-evans/create-pull-request` | v8 | [releases](https://github.com/peter-evans/create-pull-request/releases) |
+
+**最佳实践**: 每次创建新 workflow 时，先检查上述 Actions 是否有新版本发布，使用最新版本可以获得更好的性能和安全性。

@@ -164,7 +164,7 @@ gh workflow run update-{pkgname}.yml
     # 更新 pkgrel: 1
 
 - name: Publish to AUR
-  uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+  uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
   with:
     updpkgsums: true  # ✅ 自动计算真实 checksum
     # ... 其他参数

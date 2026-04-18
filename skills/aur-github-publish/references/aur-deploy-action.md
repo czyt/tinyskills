@@ -6,7 +6,7 @@
 
 ```yaml
 - name: Publish to AUR
-  uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+  uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
   with:
     pkgname: myapp-bin
     pkgbuild: ./myapp-bin/PKGBUILD
@@ -20,7 +20,7 @@
 
 ```yaml
 - name: Publish to AUR
-  uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+  uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
   with:
     # 必需参数
     pkgname: myapp-bin              # AUR 包名
@@ -238,7 +238,7 @@ git push origin master
 
 ```yaml
 - name: Publish to AUR
-  uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+  uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
   with:
     pkgname: myapp-bin  # ✅ 必须已存在于 AUR
     pkgbuild: ./myapp-bin/PKGBUILD
