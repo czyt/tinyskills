@@ -15,6 +15,8 @@ Each skill is self-contained in its own folder with a `SKILL.md` file containing
 
 Many skills in this repo are open source (Apache 2.0). We've also included the document creation & editing skills that power [Claude's document capabilities](https://www.anthropic.com/news/create-files) under the hood in the [`skills/docx`](./skills/docx), [`skills/pdf`](./skills/pdf), [`skills/pptx`](./skills/pptx), and [`skills/xlsx`](./skills/xlsx) subfolders. These are source-available, not open source, but we wanted to share these with developers as a reference for more complex skills that are actively used in a production AI application.
 
+> **Note:** These skills are designed for Claude but can also be used with other AI agents. The skill format is flexible and can be adapted to work with various AI systems that support instruction-based prompting.
+
 ## Disclaimer
 
 **These skills are provided for demonstration and educational purposes only.** While some of these capabilities may be available in Claude, the implementations and behaviors you receive from Claude may differ from what is shown in these skills. These skills are meant to illustrate patterns and possibilities. Always test skills thoroughly in your own environment before relying on them for critical tasks.
@@ -25,33 +27,6 @@ Many skills in this repo are open source (Apache 2.0). We've also included the d
 - [./template](./template): Skill template
 
 # Try in Claude Code, Claude.ai, and the API
-
-## Local Installation (Development)
-
-If you've cloned this repository and want to use the skills locally, you can create symbolic links to `~/.claude/skills/` for easier development:
-
-### Linux / macOS
-```bash
-# Install all skills from this repository
-./install.sh
-
-# Uninstall all skills from this repository
-./uninstall.sh
-```
-
-### Windows (PowerShell)
-```powershell
-# Install all skills from this repository
-# Note: Requires Administrator privileges or Developer Mode enabled
-.\install.ps1
-
-# Uninstall all skills from this repository
-.\uninstall.ps1
-```
-
-**Windows Note:** Creating symbolic links on Windows requires either:
-- Running PowerShell as Administrator, OR
-- Enabling Developer Mode: Settings → Update & Security → For developers
 
 ## Claude Code
 You can register this repository as a Claude Code Plugin marketplace by running the following command in Claude Code:
