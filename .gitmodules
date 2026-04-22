@@ -1,6 +1,0 @@
-[submodule "skills/darwin-skill"]
-	path = skills/darwin-skill
-	url = https://github.com/alchaincyf/darwin-skill.git
-[submodule "skills/nuwa-skill"]
-	path = skills/nuwa-skill
-	url = https://github.com/alchaincyf/nuwa-skill.git

@@ -1,5 +1,0 @@
-timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
-2026-04-16T21:46	e5b063d	aur-github-publish	-	85.5	baseline	-	初始评估	dry_run
-2026-04-16T21:46	e5b063d	homebrew-github-publish	-	79	baseline	-	初始评估	dry_run
-2026-04-16T21:50	48f6c1d	homebrew-github-publish	79	82	keep	边界条件	补充4个边界条件	dry_run
-2026-04-18T23:30	608cdfd	homebrew-github-publish	76.5	82	keep	指令具体性	补充架构自动检测+sed示例表格	dry_run
