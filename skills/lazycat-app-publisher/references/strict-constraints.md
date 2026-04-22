@@ -292,6 +292,56 @@ locales:
 | 使用 `/lzcapp/documents` | **1.5.0** | 新文档路径 |
 | 使用 `permissions` | **1.5.0** | 权限声明系统 |
 
+### ⚠️ 权限自动分析（根据 binds 路径）
+
+**重要：当 `binds` 包含特定路径时，必须在 `permissions` 中声明对应权限！**
+
+| binds 路径前缀 | 必需权限 id | 声明位置 | 说明 |
+|---------------|------------|----------|------|
+| `/lzcapp/documents` | `document.private` | `permissions.required` | 应用文稿目录，必须声明 |
+| `/lzcapp/documents/${uid}` | `document.private` | `permissions.required` | 用户隔离文稿目录 |
+| `/lzcapp/run/mnt/home` | `document.read` + `document.write` | `permissions.required` | 兼容旧路径（v1.7.0+ 需授权） |
+| `/lzcapp/media/RemoteFS` | `media.read` | `permissions.optional` | 懒猫网盘挂载（需 enable_media_access） |
+| `/lzcapp/media` | `media.read` 或 `media.write` | `permissions.optional` | 媒体目录访问 |
+
+**检测流程**：
+
+```
+1. 解析 services.*.binds 列表
+2. 匹配路径前缀（如 /lzcapp/documents）
+3. 自动生成 permissions.required 或 permissions.optional
+4. 提示用户确认权限声明
+```
+
+**正确示例**：
+
+```yaml
+# lzc-manifest.yml - 检测到 /lzcapp/documents 挂载
+services:
+  filebrowser:
+    binds:
+      - /lzcapp/documents:/data  # ✅ 挂载应用文稿目录
+
+# package.yml - 自动生成的权限声明
+permissions:
+  required:
+    - net.internet
+    - document.private  # ✅ 检测到 /lzcapp/documents 时自动添加
+```
+
+**错误示例**：
+
+```yaml
+# ❌ 错误：使用 /lzcapp/documents 但 package.yml 缺少权限声明
+services:
+  app:
+    binds:
+      - /lzcapp/documents:/data
+
+# ❌ package.yml 缺少 permissions
+# 这会导致应用无法正常访问文稿目录
+```
+
 ---
 
 ## 4. lzc-manifest.yml 严格约束
@@ -555,6 +605,11 @@ services:
 - [ ] `author` 字段已自动填入（优先级：用户指定 > GitHub URL 提取 > 应用名+Team）
   - 如果 `homepage` 是 GitHub URL，author 应为 GitHub 用户名
   - 如果无 GitHub URL，author 应为 `应用名 Team`
+- [ ] **`permissions` 已根据 binds 路径自动分析生成**
+  - 检测到 `/lzcapp/documents` → 添加 `document.private`
+  - 检测到 `/lzcapp/run/mnt/home` → 添加 `document.read` + `document.write`
+  - 检测到 `/lzcapp/media` → 添加 `media.read` 或 `media.write`
+  - 网络服务 → 添加 `net.internet`
 
 ### lzc-manifest.yml 检查清单（LPK v2）
 
@@ -565,6 +620,10 @@ services:
 - [ ] 没有 `lzc-sdk-version`
 - [ ] **`usage` 是字符串形式，不是嵌套结构**
 - [ ] **免密登录 `when` 路径与实际登录页匹配**
+- [ ] **`binds` 路径与 `package.yml.permissions` 声明匹配**
+  - `/lzcapp/documents` → 需要 `document.private` 权限
+  - `/lzcapp/run/mnt/home` → 需要 `document.read` + `document.write` 权限
+  - `/lzcapp/media` → 需要 `media.read` 或 `media.write` 权限
 
 ### 免密登录配置检查清单
 
@@ -576,5 +635,6 @@ services:
 
 ---
 
-**最后更新**: 2026-04-19
+**最后更新**: 2026-04-22
 **基于**: 懒猫开发者文档 v1.5.0+
+**新增**: 权限自动分析（根据 binds 路径）

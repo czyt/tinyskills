@@ -1,6 +1,6 @@
 ---
 name: lazycat-app-publisher
-description: LazyCat v1.5.0+ 应用发布助手，支持智能 Docker Compose 转换、依赖分析、自动凭证生成、compose_override、高级路由（upstreams/ingress）、文件处理器、硬件加速。默认 LPK v2 格式（package.yml + lzc-manifest.yml）。触发词：Docker Compose 转 LazyCat、发布应用到 LazyCat 商店、创建 LPK 包、管理 LazyCat 应用生命周期。
+description: LazyCat v1.5.0+ 应用发布助手，支持智能 Docker Compose 转换、依赖分析、自动凭证生成、compose_override、高级路由、权限自动分析（binds路径→permissions声明）。默认 LPK v2 格式。触发词：Docker Compose 转 LazyCat、发布应用到 LazyCat、创建 LPK 包、管理 LazyCat 应用生命周期、权限声明。
 preferences:
   - id: add_root_to_public_path
     name: 添加 / 到 public_path
@@ -161,6 +161,29 @@ GET https://search.lazycat.cloud/api/v1/app?keyword={app_name}&size=48
 #### Step 2.1: 生成 package.yml（静态元数据）
 
 **⚠️ 检查点**: 确认包名前缀（默认 `cloud.lazycat.app`）
+
+**⚠️ 检查点**: 自动分析权限需求（根据 binds 路径自动声明）
+
+**权限自动分析逻辑**：当 `lzc-manifest.yml` 中 `services.*.binds` 包含特定路径时，**必须**在 `package.yml.permissions` 中声明对应权限：
+
+| binds 路径 | 必需权限 id | 说明 |
+|-----------|------------|------|
+| `/lzcapp/documents` | `document.private` | 应用文稿目录，必须声明 |
+| `/lzcapp/documents/${uid}` | `document.private` | 用户隔离文稿目录 |
+| `/lzcapp/run/mnt/home` | `document.read` + `document.write` | 兼容旧路径（v1.7.0+ 需授权） |
+| `/lzcapp/media` | `media.read` 或 `media.write` | 媒体目录访问 |
+
+**检测流程**：
+```
+解析 services.*.binds 列表
+→ 匹配路径前缀
+→ 自动生成 permissions.required 或 permissions.optional
+→ 提示用户确认权限声明
+```
+
+**⚠️ 检查点**: 如果检测到 `/lzcapp/documents` 挂载，必须暂停并告知用户：
+- 「检测到应用文稿目录 `/lzcapp/documents` 挂载，需要声明 `document.private` 权限」
+- 「该权限允许应用使用私有文稿目录，实际数据按用户隔离存放」
 
 **⚠️ 检查点**: 确认 author 来源（按以下优先级）：
 
@@ -688,7 +711,7 @@ application:
 **⚠️ 重要：LPK v2 格式必须设置 `min_os_version: 1.5.0`**
 
 ```yaml
-# package.yml - 静态元数据
+# package.yml - 静态元数据（含自动生成的权限声明）
 package: cloud.lazycat.app.myapp
 version: 1.0.0
 name: MyApp
@@ -706,11 +729,16 @@ locales:
     name: "My App"
     description: "My application"
 
+# ⚠️ 权限声明 - 根据 binds 路径自动分析生成
+# 检测到 /lzcapp/documents → 添加 document.private
+# 检测到网络服务 → 添加 net.internet
 permissions:
   required:
-    - net.internet
+    - net.internet           # 网络访问（大部分应用必需）
+    - document.private       # ⚠️ 检测到 /lzcapp/documents 挂载时自动添加
   optional:
-    - document.read
+    - document.read          # 可选：读取用户文稿
+    - document.write         # 可选：写入用户文稿
 ```
 
 ```yaml
@@ -837,6 +865,17 @@ environment:
 # ❌ v1.5.0+ 使用旧文档路径
 binds:
   - /lzcapp/document:/data  # 使用 /lzcapp/documents
+
+# ❌ 使用 /lzcapp/documents 但缺少权限声明
+# ⚠️ 这是用户报告的实际问题：绑定 /lzcapp/documents 时未自动添加权限
+services:
+  app:
+    binds:
+      - /lzcapp/documents:/data  # ❌ 需要 document.private 权限声明
+# package.yml 缺少 permissions:
+# permissions:
+#   required:
+#     - document.private  # ✅ 必须声明此权限
 
 # ❌ command 使用数组而非字符串
 services:
@@ -996,7 +1035,7 @@ application:
 
 ## Critical Rules
 
-### 🚨 TOP 7 CRITICAL RULES
+### 🚨 TOP 8 CRITICAL RULES
 
 执行转换时，**遇到以下情况必须暂停并询问用户**：
 
@@ -1100,6 +1139,55 @@ injects:
   - id: login
     when:
       - /login    # ❌ Jellyfin 实际登录页是 /web/#/login.html
+```
+
+#### ⚠️ Rule 8: binds 路径必须匹配权限声明（自动分析）
+`binds` 中使用特定路径时，**必须**在 `package.yml.permissions` 中声明对应权限：
+
+| binds 路径前缀 | 必需权限 id | 声明位置 |
+|---------------|------------|----------|
+| `/lzcapp/documents` | `document.private` | `permissions.required` |
+| `/lzcapp/documents/${uid}` | `document.private` | `permissions.required` |
+| `/lzcapp/run/mnt/home` | `document.read` + `document.write` | `permissions.required` |
+| `/lzcapp/media` | `media.read` 或 `media.write` | 按读写需求 |
+
+**⚠️ 检查点**: 检测到以下路径时，**自动添加权限声明并提示用户确认**：
+
+```
+# 检测流程
+1. 解析 services.*.binds
+2. 匹配路径前缀
+3. 自动生成 permissions
+4. 提示用户：「检测到应用文稿挂载，已自动添加 document.private 权限」
+```
+
+**正确示例**：
+```yaml
+# ✅ lzc-manifest.yml - 使用 /lzcapp/documents
+services:
+  app:
+    binds:
+      - /lzcapp/documents:/data  # ✅ 挂载应用文稿目录
+
+# ✅ package.yml - 自动生成的权限声明
+permissions:
+  required:
+    - net.internet
+    - document.private  # ✅ 检测到 /lzcapp/documents 时自动添加
+```
+
+**错误示例**：
+```yaml
+# ❌ 错误：使用 /lzcapp/documents 但缺少权限声明
+services:
+  app:
+    binds:
+      - /lzcapp/documents:/data
+
+# ❌ package.yml 缺少 permissions 声明
+# permissions:
+#   required:
+#     - document.private  # ❌ 缺少此声明会导致应用无法正常访问文稿目录
 ```
 
 ---

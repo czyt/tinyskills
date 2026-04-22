@@ -13,5 +13,15 @@
     "id": 3,
     "prompt": "检查这个免密登录配置是否正确：\napplication:\n  injects:\n    - id: login-autofill\n      when:\n        - /login\n      do:\n        - src: builtin://simple-inject-password\n          params:\n            user: \"{{ index .U \\\"login_user\\\" }}\"\n            password: \"{{ index .U \\\"login_password\\\" }}\"",
     "expected": "应指出 login_user 和 login_password 是简单字段名，不应使用 index 语法，建议改为 {{ .U.login_user }} 和 {{ .U.login_password }}"
+  },
+  {
+    "id": 4,
+    "prompt": "将这个 docker-compose.yml 转换为 LazyCat LPK v2 格式：\nservices:\n  filebrowser:\n    image: filebrowser/filebrowser:latest\n    ports:\n      - \"8080:80\"\n    volumes:\n      - /home/user/documents:/data\n    environment:\n      - FB_NOAUTH=false\n",
+    "expected": "应该将 volumes 转换为 binds，路径映射为 /lzcapp/documents:/data，并在 package.yml.permissions 中自动添加 document.private 权限声明"
+  },
+  {
+    "id": 5,
+    "prompt": "这个应用的 package.yml 权限声明是否正确？\nbinds:\n  - /lzcapp/documents:/data\n  - /lzcapp/media/RemoteFS:/media\npermissions:\n  required:\n    - net.internet\n",
+    "expected": "应指出缺少 document.private 权限（对应 /lzcapp/documents）和 media.read 权限（对应 /lzcapp/media）"
   }
 ]
