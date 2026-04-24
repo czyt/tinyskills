@@ -217,6 +217,41 @@ sudo usermod -a -G plugdev $USER
 # (logout/login may not be sufficient)
 ```
 
+### udev Rules 与 plugdev 组的关系
+
+取决于 udev rules 怎么写的：
+
+```bash
+# 查看当前 udev rules
+grep -r "27b8" /etc/udev/rules.d/ 2>/dev/null
+cat /etc/udev/rules.d/51-blink1.rules
+```
+
+| udev 写法 | 是否需要 plugdev |
+|------------|------------------|
+| `GROUP="plugdev", MODE="0664"` | ✅ 必须 |
+| `MODE="0666"` | ❌ 理论不需要（但实际可能仍需要） |
+| `TAG+="uaccess"` | ❌ 不需要（推荐现代写法） |
+
+**注意**：即使 `MODE="0666"`，某些发行版/配置仍要求用户在 plugdev 组。遇到权限问题，先尝试加入组。
+
+**推荐**：用 `TAG+="uaccess"` 替代 GROUP 写法：
+```udev
+ATTRS{idVendor}=="27b8", ATTRS{idProduct}=="01ed", TAG+="uaccess"
+```
+uaccess 是 systemd/logind 的动态授权机制，当前登录用户自动获得设备权限。
+
+### 验证设备权限
+
+```bash
+# 查找设备
+lsusb | grep -i blink   # 如 Bus 001 Device 005
+
+# 查看设备节点权限
+ls -la /dev/bus/usb/001/005
+# 看 GROUP 和权限位
+```
+
 ## Common Mistakes
 
 | Issue | Fix |
