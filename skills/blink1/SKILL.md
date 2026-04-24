@@ -9,6 +9,8 @@ description: Use when controlling blink(1) USB LED device via blink1-tool CLI, s
 
 blink1-tool controls ThingM blink(1) USB LED devices. Supports RGB/HSB colors, fade transitions, patterns, multi-device, and multi-LED (mk2+).
 
+**Quick Fix**: If device not detected on Linux, run `blink1-tool --add_udev_rules` then replug. See [Troubleshooting](#troubleshooting) for details.
+
 ## Quick Reference
 
 | Action | Command |
