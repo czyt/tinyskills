@@ -140,6 +140,33 @@ blink1-tool --add_udev_rules
 | `-q` | Quiet (mute output) |
 | `-v` | Verbose debug |
 
+## Troubleshooting
+
+### No Device Found
+```bash
+# Check if device is connected
+blink1-tool --list
+
+# If empty output:
+# 1. Physical: check USB connection
+# 2. Linux: run --add_udev_rules, replug, or try with sudo
+# 3. Permission: ensure user in plugdev group
+```
+
+### Permission Denied (Linux)
+```bash
+# Option 1: Add udev rules (persistent)
+blink1-tool --add_udev_rules
+# Then replug device
+
+# Option 2: Temporary sudo
+sudo blink1-tool --list
+
+# Option 3: Add user to plugdev group
+sudo usermod -a -G plugdev $USER
+# Logout and login again
+```
+
 ## Common Mistakes
 
 | Issue | Fix |
@@ -149,3 +176,5 @@ blink1-tool --add_udev_rules
 | Pattern blocks terminal | Pattern runs in blink1-tool - use background |
 | Hex without # works | Both `#FF9900` and `FF9900` valid |
 | mk2+ features on mk1 | LED selection, savepattern require mk2+ |
+| Multiple devices conflict | Use `-d 0` or `-d all` to specify target |
+| Color looks washed out | Try `-g` to disable gamma correction |
