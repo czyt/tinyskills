@@ -167,6 +167,8 @@ blink1-tool --ledn 1,3,5,7          # Specific LED list
 blink1-tool --add_udev_rules
 
 # Then replug device
+
+# Verify: blink1-tool --list should now show device
 ```
 
 ## Options Summary
