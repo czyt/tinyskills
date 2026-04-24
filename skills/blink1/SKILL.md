@@ -65,6 +65,18 @@ blink1-tool -m 100 --rgb=255,0,0   # Quick 0.1s fade to red
 blink1-tool -m 2000 --rgb=0,255,0  # Slow 2s fade to green
 ```
 
+### Brightness Control
+```bash
+# -b sets brightness (0-255)
+# 0 = use actual RGB values
+# 1-255 = scale brightness (1=min, 255=max)
+blink1-tool -b 50 --rgb=255,255,255   # Dim white
+blink1-tool -b 200 --rgb=ff0000       # Bright red
+
+# Or use HSB with brightness parameter
+blink1-tool --hsb=0,100,25            # Red at 25% brightness
+```
+
 ## Blinking & Effects
 
 ### Basic Blink
