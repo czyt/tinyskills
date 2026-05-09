@@ -42,13 +42,20 @@ chmod +x scripts/*.sh
 
 ```
 Step 1: 解析用户意图，提取搜索关键词
+  - 如果用户指定了质量偏好，加 --quality 参数
+  - 如果用户指定了数量，加 --limit 参数
 Step 2: 执行搜索
   ./scripts/search-movie.sh search "关键词" --limit 5
-Step 3: 展示结果（标题、年份、评分、质量、大小）
+Step 3: 按以下格式展示结果给用户：
+  📽️ [编号] 标题 (年份) ⭐ 评分
+     质量: xxx | 大小: xxx | Seeds: xxx
+     ID: xxx | IMDb: xxx
 Step 4: 🔍 确认 — 询问用户选择哪条结果（编号），或调整搜索条件
-Step 5: 用户选择后，展示该条目的 magnet 链接
+Step 5: 用户选择后，用 details 命令获取完整信息：
+  ./scripts/search-movie.sh details --movie-id {ID}
+  展示该条目的所有可用质量版本及对应 magnet 链接
 Step 6: 🔍 确认 — 询问是否添加到 qBittorrent
-  - 是 → 执行 流程D（qBt 投递）
+  - 是 → 执行 流程D（qBt 投递），传入 magnet 链接
   - 否 → 结束
 ```
 
@@ -58,12 +65,18 @@ Step 6: 🔍 确认 — 询问是否添加到 qBittorrent
 Step 1: 解析用户意图，提取艺术家/专辑关键词
 Step 2: 执行搜索
   ./scripts/search-music.sh "关键词" 10
-Step 3: 展示搜索结果（专辑名、艺术家、年份、曲目数）
+Step 3: 输出为 TSV 格式（ID\t专辑名\t艺术家\t年份\t曲目数），按以下格式展示：
+  🎵 [编号] 专辑名 — 艺术家 (年份) [N首]
 Step 4: 🔍 确认 — 询问用户选择哪张专辑（编号）
-Step 5: 用户选择后，执行下载
+Step 5: 用户选择后，用对应 ID 执行下载
   ./scripts/download-music.sh {album_id}
-Step 6: 展示下载状态（START/DONE_AUDIO/FAIL_* 等状态行）
-Step 7: 告知下载目录位置 {JOOX_ROOT_DIR}/{艺术家}/{专辑名}/
+  如用户指定了自定义目录：
+  ./scripts/download-music.sh {album_id} ~/自定义路径
+Step 6: 实时展示下载状态：
+  - DONE_AUDIO → ✅ 曲名 下载完成
+  - SKIP_EXISTS → ⏭️ 曲名 已存在，跳过
+  - FAIL_AUDIO/FAIL_NO_URL → ❌ 曲名 下载失败
+Step 7: 告知下载目录：{JOOX_ROOT_DIR}/{艺术家}/{专辑名}/
 ```
 
 ### 流程 C：磁力搜索
@@ -72,9 +85,10 @@ Step 7: 告知下载目录位置 {JOOX_ROOT_DIR}/{艺术家}/{专辑名}/
 Step 1: 解析用户意图，提取搜索关键词
 Step 2: 执行搜索
   ./scripts/search-magnet.sh "关键词" 5
-Step 3: 展示结果（标题、大小、磁力链接）
-Step 4: 🔍 确认 — 询问用户选择哪条结果
-Step 5: 用户选择后，展示磁力链接
+Step 3: 按以下格式展示结果：
+  🧲 [编号] 标题 (大小)
+Step 4: 🔍 确认 — 询问用户选择哪条结果（编号）
+Step 5: 用户选择后，展示对应的磁力链接
 Step 6: 🔍 确认 — 询问是否添加到 qBittorrent
   - 是 → 执行 流程D（qBt 投递）
   - 否 → 结束
@@ -83,17 +97,19 @@ Step 6: 🔍 确认 — 询问是否添加到 qBittorrent
 ### 流程 D：qBittorrent 投递
 
 ```
-Step 1: 确认 magnet 链接或 torrent URL 已获取
-Step 2: 询问保存路径和分类（提供默认值）
-  - 默认保存路径：/downloads
-  - 默认分类：无
+前置条件：已获取 magnet 链接或 torrent URL
+Step 1: 根据资源类型建议分类：
+  - 电影 → --category movies --save-path /downloads/movies
+  - 音乐 → --category music --save-path /downloads/music
+  - 其他 → 询问用户
+Step 2: 🔍 确认 — 展示投递参数（路径、分类），用户确认后执行
 Step 3: 执行添加
   ./scripts/qbt.sh add "magnet:..." --save-path PATH --category NAME
-Step 4: 验证添加是否成功
+Step 4: 验证添加结果
   ./scripts/qbt.sh list --filter downloading --limit 5
 Step 5: 报告结果
-  - 成功 → 展示任务名和状态
-  - 失败 → 检查 qBt 连接（./scripts/qbt.sh status）并报告错误
+  - ✅ 成功 → 展示任务名、大小、状态
+  - ❌ 失败 → 检查连接（./scripts/qbt.sh status），报告具体错误
 ```
 
 ---
@@ -290,24 +306,16 @@ master_tapeUrl > hiresUrl > flacUrl > r320Url > r192Url > mp3Url > m4aUrl
 
 ---
 
-## 异常处理
+## 注意事项与异常处理
 
 | 场景 | 处理方式 |
 |------|---------|
 | JOOX Cookie 失效 | 提示用户重新获取并更新 `JOOX_COOKIE` 环境变量 |
-| YTS API 不可用 | 提示用户检查网络或通过 `YTS_API_BASE_URL` 切换镜像地址 |
-| 磁力搜索站改版 | 提示用户 search-magnet.sh 的 grep/sed 规则可能需要更新 |
-| qBt 连接失败 | 先用 `./scripts/qbt.sh status` 检查连接，提示检查 QB_HOST/QB_PORT/凭据 |
-| 搜索无结果 | 建议用户换关键词、调整 quality/rating 过滤条件 |
-| 下载中断 | download-music.sh 支持断点续传（SKIP_EXISTS 跳过已有文件），直接重跑即可 |
-
----
-
-## 注意事项
-
-- **JOOX Cookie** 有时效性，失效后需重新获取并更新 `JOOX_COOKIE`
-- **QB_PASS** 建议通过环境变量传入，避免明文出现在命令行历史里
-- `search-magnet.sh` 依赖目标网站页面结构，站点改版后可能需要调整 grep/sed 规则
-- YTS API 为第三方镜像，如不可用可通过 `YTS_API_BASE_URL` 切换地址
-- 所有脚本启动时自动检测依赖，缺失时输出安装提示
-- qBt session 使用临时 cookie 文件，脚本退出时自动登出清理
+| YTS API 不可用 | 提示检查网络或通过 `YTS_API_BASE_URL` 切换镜像地址 |
+| 磁力搜索站改版 | search-magnet.sh 的 grep/sed 规则可能需要更新 |
+| qBt 连接失败 | 先用 `./scripts/qbt.sh status` 检查，提示检查 QB_HOST/QB_PORT/凭据 |
+| 搜索无结果 | 建议换关键词、调整 quality/rating 过滤条件 |
+| 下载中断 | 支持断点续传（SKIP_EXISTS 跳过已有文件），直接重跑即可 |
+| QB_PASS 安全 | 建议通过环境变量传入，避免明文出现在命令行历史里 |
+| 依赖缺失 | 所有脚本启动时自动检测依赖，缺失时输出安装提示 |
+| qBt session | 使用临时 cookie 文件，脚本退出时自动登出清理
