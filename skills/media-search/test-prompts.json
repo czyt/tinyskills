@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我找一下 Inception 的种子",
+    "expected": "调用 search-movie.sh search 'Inception'，展示结果（标题、质量、大小、magnet链接），并询问是否添加到qBt"
+  },
+  {
+    "id": 2,
+    "prompt": "搜索周杰伦的专辑并下载最新一张",
+    "expected": "先用 search-music.sh 搜索周杰伦专辑，展示列表，识别最新专辑，调用 download-music.sh 下载，展示进度"
+  },
+  {
+    "id": 3,
+    "prompt": "把刚才下载的任务添加到 qBittorrent，放到 /downloads/movies 分类",
+    "expected": "调用 qbt.sh add 带 --save-path /downloads/movies --category movies，确认添加成功"
+  }
+]
