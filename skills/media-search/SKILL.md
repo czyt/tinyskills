@@ -1,3 +1,8 @@
+---
+name: media-search
+description: 搜索电影种子/磁力链接、搜索下载音乐专辑、管理 qBittorrent 下载任务。触发词：找资源、下载、磁力、种子、torrent、magnet、影视、音乐下载、qBt、搜电影、下电影、搜歌、下歌
+---
+
 # 资源搜索 Skill
 
 ## 触发条件
@@ -8,7 +13,7 @@
 - 搜索磁力资源
 - 搜索、下载音乐专辑
 - 添加/管理 qBittorrent 下载任务
-- 提到"找资源"、"下载"、"磁力"、"种子"、"torrent"、"magnet"、"影视"、"音乐下载"、"qBt"
+- 提到"找资源"、"下载"、"磁力"、"种子"、"torrent"、"magnet"、"影视"、"音乐下载"、"qBt"、"搜电影"、"下电影"、"搜歌"、"下歌"
 
 ---
 
@@ -25,6 +30,70 @@
 赋予可执行权限：
 ```bash
 chmod +x scripts/*.sh
+```
+
+---
+
+## 工作流
+
+根据用户意图，选择对应流程执行：
+
+### 流程 A：电影搜索
+
+```
+Step 1: 解析用户意图，提取搜索关键词
+Step 2: 执行搜索
+  ./scripts/search-movie.sh search "关键词" --limit 5
+Step 3: 展示结果（标题、年份、评分、质量、大小）
+Step 4: 🔍 确认 — 询问用户选择哪条结果（编号），或调整搜索条件
+Step 5: 用户选择后，展示该条目的 magnet 链接
+Step 6: 🔍 确认 — 询问是否添加到 qBittorrent
+  - 是 → 执行 流程D（qBt 投递）
+  - 否 → 结束
+```
+
+### 流程 B：音乐搜索与下载
+
+```
+Step 1: 解析用户意图，提取艺术家/专辑关键词
+Step 2: 执行搜索
+  ./scripts/search-music.sh "关键词" 10
+Step 3: 展示搜索结果（专辑名、艺术家、年份、曲目数）
+Step 4: 🔍 确认 — 询问用户选择哪张专辑（编号）
+Step 5: 用户选择后，执行下载
+  ./scripts/download-music.sh {album_id}
+Step 6: 展示下载状态（START/DONE_AUDIO/FAIL_* 等状态行）
+Step 7: 告知下载目录位置 {JOOX_ROOT_DIR}/{艺术家}/{专辑名}/
+```
+
+### 流程 C：磁力搜索
+
+```
+Step 1: 解析用户意图，提取搜索关键词
+Step 2: 执行搜索
+  ./scripts/search-magnet.sh "关键词" 5
+Step 3: 展示结果（标题、大小、磁力链接）
+Step 4: 🔍 确认 — 询问用户选择哪条结果
+Step 5: 用户选择后，展示磁力链接
+Step 6: 🔍 确认 — 询问是否添加到 qBittorrent
+  - 是 → 执行 流程D（qBt 投递）
+  - 否 → 结束
+```
+
+### 流程 D：qBittorrent 投递
+
+```
+Step 1: 确认 magnet 链接或 torrent URL 已获取
+Step 2: 询问保存路径和分类（提供默认值）
+  - 默认保存路径：/downloads
+  - 默认分类：无
+Step 3: 执行添加
+  ./scripts/qbt.sh add "magnet:..." --save-path PATH --category NAME
+Step 4: 验证添加是否成功
+  ./scripts/qbt.sh list --filter downloading --limit 5
+Step 5: 报告结果
+  - 成功 → 展示任务名和状态
+  - 失败 → 检查 qBt 连接（./scripts/qbt.sh status）并报告错误
 ```
 
 ---
@@ -115,7 +184,7 @@ export QB_PASS="your_password"
 选项:
   --limit N             返回数量 (1-50，list 默认 10)
   --page N              页码
-  --quality VALUE       480p / 720p / 1080p / 1080p.x265 / 2160p / 3D
+  --quality VALUE       480p / 720p / 1080p / 1080p.x265 / 2164p / 3D
   --minimum-rating N    最低 IMDb 评分 (0-9)
   --genre VALUE         action / comedy / drama / horror / sci-fi ...
   --sort-by VALUE       title / year / rating / peers / seeds / download_count
@@ -218,6 +287,19 @@ list 选项:
 ```
 master_tapeUrl > hiresUrl > flacUrl > r320Url > r192Url > mp3Url > m4aUrl
 ```
+
+---
+
+## 异常处理
+
+| 场景 | 处理方式 |
+|------|---------|
+| JOOX Cookie 失效 | 提示用户重新获取并更新 `JOOX_COOKIE` 环境变量 |
+| YTS API 不可用 | 提示用户检查网络或通过 `YTS_API_BASE_URL` 切换镜像地址 |
+| 磁力搜索站改版 | 提示用户 search-magnet.sh 的 grep/sed 规则可能需要更新 |
+| qBt 连接失败 | 先用 `./scripts/qbt.sh status` 检查连接，提示检查 QB_HOST/QB_PORT/凭据 |
+| 搜索无结果 | 建议用户换关键词、调整 quality/rating 过滤条件 |
+| 下载中断 | download-music.sh 支持断点续传（SKIP_EXISTS 跳过已有文件），直接重跑即可 |
 
 ---
 
