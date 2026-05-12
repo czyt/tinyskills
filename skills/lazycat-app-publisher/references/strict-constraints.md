@@ -492,7 +492,8 @@ ext_config:
 | `tmpfs` | `[]string` | tmpfs 挂载 |
 | `depends_on` | `[]string` | 依赖的服务 |
 | `healthcheck` | `*HealthCheckConfig` | 健康检查（v1.4.1+） |
-| `user` | `*string` | UID 或用户名 |
+| `user` | `*string` | UID 或用户名（不与 `run_as` 同时使用） |
+| `run_as` | `string \| int` | 数字 UID/GID + `/lzcapp` 持久目录 owner 映射 (v1.6.0+) |
 | `cpu_shares` | `int64` | CPU 份额 |
 | `cpus` | `float32` | CPU 核心数 |
 | `mem_limit` | `string\|int` | 内存上限 |
@@ -509,6 +510,8 @@ ext_config:
 - ❌ `volumes` - 使用 `binds`
 - ❌ `ports` - HTTP 使用 `application.upstreams`，TCP/UDP 使用 `application.ingress`
 - ❌ `command` 为数组 - 必须是字符串
+- ❌ `user` 与 `run_as` 在同一级别同时使用
+- ❌ `setup_script` 与 `run_as` 在同一 service 同时使用
 
 ### ✅ 正确示例
 
@@ -568,6 +571,8 @@ services:
 | `health_check` | `AppHealthCheckExt` | 应用健康检查（带下划线） |
 | `secondary_domains` | `[]string` | 次级域名 |
 | `oidc_redirect_path` | `string` | OIDC 回调路径 |
+| `user` | `string` | 容器运行用户（不与 `run_as` 同时使用） |
+| `run_as` | `string \| int` | 数字 UID/GID + `/lzcapp` 持久目录 owner 映射 (v1.6.0+) |
 | `injects` | `[]InjectConfig` | 脚本注入 |
 
 ### 重要区分

@@ -108,6 +108,44 @@ application:
 | `health_check` | `AppHealthCheckExt` | `app` 容器的健康检测 |
 | `secondary_domains` | `[]string` | 次级域名列表 (v1.3.9+) |
 | `oidc_redirect_path` | `string` | OIDC 回调路径 (用于 OIDC 集成) |
+| `user` | `string` | `app` 容器运行用户，语法与 Docker Compose `user` 一致 (v1.6.0+) |
+| `run_as` | `string \| int` | `app` 容器数字 UID/GID，同时启用 `/lzcapp` 持久目录 owner 映射 (v1.6.0+)，见下方 4.5 |
+
+---
+### 4.5 `run_as` 配置 (v1.6.0+)
+
+`run_as` 用于声明容器内主进程使用的数字 UID/GID，并让系统按同一身份映射 `/lzcapp` 下的持久目录 owner。
+
+**支持格式：**
+
+| 写法 | 含义 |
+| ---- | ---- |
+| `1000` | 使用 UID `1000`，GID 同样为 `1000` |
+| `"1000:1000"` | 使用 UID `1000`、GID `1000` |
+
+**规则：**
+
+1. `run_as` 只接受数字 UID/GID，不接受用户名或组名。
+2. `application.run_as` 不得与 `application.user` 同时使用。
+3. `services.<name>.run_as` 不得与同一 service 的 `user` 或 `setup_script` 同时使用。
+4. `application.run_as` 只作用于内置 `app` service；不会自动作用到 `services` 中未声明 `run_as` 的其他 service。
+5. 每个 service 可以单独声明自己的 `run_as`。不同 service 声明不同 UID/GID 时，会分别获得与自身身份一致的 `/lzcapp` 持久目录视图。
+6. 使用 `run_as` 后，容器内看到的 `/lzcapp/document`、`/lzcapp/documents/<uid>`、`/lzcapp/var`、`/lzcapp/cache` 会按声明的 UID/GID 暴露 owner。容器内该 UID/GID 创建的新文件也会保持同一 owner 语义。
+7. `/lzcapp/run` 是运行态目录，系统保证声明了 `run_as` 的容器仍可写入该目录。
+8. 如果继续使用 `user` 字段，则只调整容器进程用户，不启用上述 `/lzcapp` 持久目录 owner 映射。
+
+**示例：**
+
+```yml
+application:
+  subdomain: demo
+  run_as: "1000:1000"
+
+services:
+  worker:
+    image: registry.lazycat.cloud/lzc/lzcapp:3.20.3
+    run_as: "2000:2000"
+```
 
 ---
 
@@ -181,7 +219,8 @@ services:
 | `tmpfs` | `[]string` | 挂载 tmpfs volume (可选) |
 | `depends_on` | `[]string` | 依赖的其他容器服务 (app 这个名字除外) |
 | `healthcheck` | `*HealthCheckConfig` | 容器的健康检测策略 (v1.4.1+) |
-| `user` | `*string` | 容器运行的 UID 或 username (可选) |
+| `user` | `*string` | 容器运行的 UID 或 username (可选，不与 `run_as` 同时使用) |
+| `run_as` | `string \| int` | 容器运行的数字 UID/GID，同时启用 `/lzcapp` 持久目录 owner 映射 (v1.6.0+)，见上方 4.5 |
 | `cpu_shares` | `int64` | CPU 份额 |
 | `cpus` | `float32` | CPU 核心数 |
 | `mem_limit` | `string\|int` | 容器的内存上限 |

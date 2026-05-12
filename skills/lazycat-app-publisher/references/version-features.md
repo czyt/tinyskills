@@ -27,6 +27,7 @@ This document maps LazyCat OS versions to their features, helping you determine 
 | **`import_resources`** | **v1.5.2** | **`package.yml` 中声明导入 Skill/MCP 资源** |
 | **`resource_exports`** | **v1.5.2** | **`lzc-build.yml` 中配置 Skill/MCP 导出** |
 | **Skill / MCP export** | **v1.5.2** | **应用通过 `resources/` 目录提供 Skill/MCP** |
+| **`run_as` (UID/GID + owner 映射)** | **v1.6.0+** | **容器数字 UID/GID + `/lzcapp` 持久目录 owner 映射** ⭐ |
 
 ---
 
@@ -187,6 +188,18 @@ services:
 
 **Important:** This is the recommended minimum version for modern apps.
 
+### v1.6.0
+
+**New Features:**
+- **`run_as`**: Container UID/GID with `/lzcapp` persistent directory owner mapping
+- `application.run_as` for the main app container, `services.<name>.run_as` per-service
+- Only accepts numeric UID/GID (`1000` or `"1000:1000"`)
+- Cannot be used with `user` or `setup_script` simultaneously
+- Each service can have its own `run_as` with independent owner views
+
+**Required for:**
+- Multi-UID/GID applications needing persistent directory ownership
+
 ### v1.5.2
 
 **New Features:**
@@ -233,6 +246,7 @@ min_os_version: 1.3.8
 | Skill/MCP `import_resources` | `1.5.2` |
 | Skill/MCP `resource_exports` | `1.5.2` |
 | Delegate permissions | `1.5.2` |
+| `run_as` (UID/GID owner 映射) | `1.6.0` |
 
 ---
 
