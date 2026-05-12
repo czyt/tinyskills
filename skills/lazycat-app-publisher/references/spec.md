@@ -317,6 +317,7 @@ locales:
 | `unsupported_platforms` | `[]string` | 可选；不支持的平台列表 |
 | `locales` | `map[string]PackageLocaleConfig` | 可选；多语言元数据 |
 | `permissions` | `PermissionsConfig` | 可选；声明应用需要的权限（v1.5.0+） |
+| `import_resources` | `[]ImportResourceConfig` | 可选；声明当前 LPK 需要导入的资源类型（v1.5.2+），详见下方 |
 
 ### Permissions 配置
 
@@ -341,6 +342,17 @@ locales:
 | `device.usb` | 访问 USB 设备 | 允许应用访问连接到微服的 USB 设备 |
 | `device.kvm` | 访问 KVM 设备 | 允许应用访问 KVM 相关设备 |
 | `compose.override` | 高危运行时覆盖 | 允许应用通过 Compose Override 覆盖最终运行时配置 |
+| `device.dri.master` | 访问 DRI Master | 允许应用访问 DRI master 设备 |
+| `device.block` | 访问块设备 | 允许应用访问块设备相关能力 |
+| `fuse.mount` | 挂载 FUSE 文件系统 | 允许应用自行挂载 FUSE 文件系统 |
+| `net.admin` | 网络管理 | 允许应用执行高危网络管理操作 |
+| `appvar.other.read` | 读取其他应用数据 | 允许应用读取其他应用实例的 appvar 数据 |
+| `appvar.other.write` | 写入其他应用数据 | 允许应用修改其他应用实例的 appvar 数据 |
+| `power.shutdown.inhibit` | 阻止关机 | 允许应用在关键运行期间申请阻止系统正常关机 |
+| `lightos.use` | 使用 LightOS | 允许应用创建、删除和修改当前 LPK 独享的 LightOS 实例 |
+| `lightos.manage` | 管理 LightOS | 允许应用管理全局 LightOS 实例，且可以创建超级权限的实例 |
+| `lzcapp.self_delegate` | 应用自委托 | 允许系统向当前应用下发用户票据（v1.5.2+，用于 app.<self>.lzcx） |
+| `lzcapp.user_delegate` | 用户委托 | 允许应用代表当前真实用户访问其他应用（v1.5.2+，用于 app.<target>.lzcx） |
 
 **示例：**
 
@@ -366,6 +378,26 @@ permissions:
     - document.write
     - device.dri.render
 ```
+
+### `import_resources` (v1.5.2+)
+
+声明当前 LPK 希望在运行时导入哪些资源类型。
+
+| 字段名 | 类型 | 描述 |
+|--------|------|------|
+| `kind` | `string` | 资源类型：`skills` 或 `mcp-providers` |
+
+```yml
+import_resources:
+  - kind: skills
+  - kind: mcp-providers
+```
+
+运行时，导入的资源位于：
+- `/lzcapp/run/resources/skills/`
+- `/lzcapp/run/resources/mcp-providers/`
+
+详见 [resource-export.md](./resource-export.md)。
 
 ---
 
@@ -468,6 +500,38 @@ locales:
 | `envs` | `[]string` | 可选；构建期变量列表，支持 `KEY=VALUE` 字符串数组 |
 | `images` | `map[string]ImageBuildConfig` | 可选；`LPK v2` 下用于产出 `embed:<alias>` 镜像引用 |
 | `compose_override` | `map` | 覆盖不支持的 Docker Compose 参数（可选） |
+| `package_override` | `map[string]any` | 可选；按顶层字段整体覆盖最终 `package.yml`，不做递归 merge（v1.5.2+） |
+| `resource_exports` | `[]ResourceExportConfig` | 可选；资源导出配置（v1.5.2+），详见下方 |
+
+### Resource Exports 配置 (v1.5.2+)
+
+应用向微服提供 Skill / MCP 资源时使用。
+
+| 字段名 | 类型 | 描述 |
+|--------|------|------|
+| `kind` | `string` | 导出资源类型：`skills` 或 `mcp-providers` |
+| `source` | `string` | 资源源目录路径，如 `./resources/skills` |
+
+```yml
+resource_exports:
+  - kind: skills
+    source: ./resources/skills
+  - kind: mcp-providers
+    source: ./resources/mcp-providers
+```
+
+构建时，`source` 下的每个一级子目录作为一个 `resource-id`：
+```
+resources/
+  skills/
+    <resource-id>/
+      SKILL.md
+  mcp-providers/
+    <resource-id>/
+      mcp.yml
+```
+
+详见 [resource-export.md](./resource-export.md)。
 
 ### Images 配置 (LPK v2)
 
@@ -513,6 +577,11 @@ services:
 ├── lzc-manifest.yml       # 应用运行结构定义
 ├── icon.png               # 应用图标（512x512 PNG）
 ├── Dockerfile             # 内嵌镜像构建（可选）
+├── resources/              # 资源导出目录（可选，v1.5.2+）
+│   ├── skills/             # Skill 导出
+│   │   └── <id>/SKILL.md
+│   └── mcp-providers/      # MCP 导出
+│       └── <id>/mcp.yml
 └── content/               # 额外内容目录（可选）
 ```
 

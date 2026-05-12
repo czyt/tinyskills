@@ -22,6 +22,11 @@ This document maps LazyCat OS versions to their features, helping you determine 
 | Network isolation | v1.3.0 | Cross-app via `$service.$appid.lzcapp` |
 | `permissions` in package.yml | v1.5.0 | Declarative permission system |
 | `ext_config.enable_document_access` | v1.5.0 | Required for document access |
+| **App Interconnect (`.lzcx`)** | **v1.5.2** | **应用间 HTTP 访问，`app.<pkg>.lzcx` 地址** |
+| **`lzcapp.self_delegate` / `lzcapp.user_delegate`** | **v1.5.2** | **应用间访问权限声明** |
+| **`import_resources`** | **v1.5.2** | **`package.yml` 中声明导入 Skill/MCP 资源** |
+| **`resource_exports`** | **v1.5.2** | **`lzc-build.yml` 中配置 Skill/MCP 导出** |
+| **Skill / MCP export** | **v1.5.2** | **应用通过 `resources/` 目录提供 Skill/MCP** |
 
 ---
 
@@ -182,6 +187,21 @@ services:
 
 **Important:** This is the recommended minimum version for modern apps.
 
+### v1.5.2
+
+**New Features:**
+- **App Interconnect**: `.lzcx` address for app-to-app HTTP access
+- **Delegate permissions**: `lzcapp.self_delegate` (access self) and `lzcapp.user_delegate` (access others)
+- **`X-HC-USER-TICKET`**: User ticket injected by ingress for auth
+- **`import_resources`**: Declare Skill/MCP resource imports in `package.yml`
+- **`resource_exports`**: Configure Skill/MCP exports in `lzc-build.yml`
+- **Skill/MCP directory**: Standard `resources/skills/<id>/SKILL.md` and `resources/mcp-providers/<id>/mcp.yml`
+- **New permissions**: `device.dri.master`, `device.block`, `fuse.mount`, `net.admin`, `appvar.other.read`, `appvar.other.write`, `power.shutdown.inhibit`, `lightos.use`, `lightos.manage`
+
+**Required for:**
+- App-to-app HTTP communication (`app.<pkg>.lzcx`)
+- Exposing/consuming Skill and MCP resources
+
 ### v1.3.0
 
 **Major Features:**
@@ -209,6 +229,10 @@ min_os_version: 1.3.8
 | `healthcheck` (services) | `1.4.1` |
 | Multi-entry points | `1.4.3` |
 | `/lzcapp/documents` | `1.5.0` |
+| App Interconnect (`.lzcx`) | `1.5.2` |
+| Skill/MCP `import_resources` | `1.5.2` |
+| Skill/MCP `resource_exports` | `1.5.2` |
+| Delegate permissions | `1.5.2` |
 
 ---
 

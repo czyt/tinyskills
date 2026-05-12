@@ -23,5 +23,20 @@
     "id": 5,
     "prompt": "这个应用的 package.yml 权限声明是否正确？\nbinds:\n  - /lzcapp/documents:/data\n  - /lzcapp/media/RemoteFS:/media\npermissions:\n  required:\n    - net.internet\n",
     "expected": "应指出缺少 document.private 权限（对应 /lzcapp/documents）和 media.read 权限（对应 /lzcapp/media）"
+  },
+  {
+    "id": 6,
+    "prompt": "这个应用需要访问另一个应用的 MCP 服务，应该如何配置 package.yml 的权限声明？目标应用包名是 cloud.lazycat.app.todo，endpoint 是 /mcp?view=default。",
+    "expected": "应使用 lzcapp.user_delegate 权限，并通过 app.cloud.lazycat.app.todo.lzcx/mcp?view=default 地址访问"
+  },
+  {
+    "id": 7,
+    "prompt": "我的应用想对外提供 MCP 和 Skill 服务，目录结构应该怎么组织？在 lzc-build.yml 中应该如何配置？",
+    "expected": "应创建 resources/skills/<id>/SKILL.md 和 resources/mcp-providers/<id>/mcp.yml，在 lzc-build.yml 中用 resource_exports 配置"
+  },
+  {
+    "id": 8,
+    "prompt": "这个 agent 应用需要读取系统中的 Skill 和 MCP provider，package.yml 中应该怎么配置？",
+    "expected": "应在 package.yml 中添加 import_resources: [{kind: skills}, {kind: mcp-providers}]"
   }
 ]
