@@ -230,7 +230,7 @@ services:
 
 ```yaml
 # Recommended for most modern applications
-min_os_version: 1.3.8
+min_os_version: 1.3.8  # 如果使用 run_as 请设为 1.6.0+
 ```
 
 ### Decision Guide

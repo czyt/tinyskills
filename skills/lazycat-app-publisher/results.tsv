@@ -7,3 +7,4 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-04-16T09:35	5403484	lazycat-app-publisher	83.8	86.3	keep	实测表现	Quick Start添加多入口配置示例，减少references依赖	dry_run
 2026-04-22T10:30	dfc2093	lazycat-app-publisher	86.3	88.0	keep	边界条件覆盖	添加Rule 8权限自动分析+binds路径映射表+检查点	dry_run
 2026-05-12T10:00	e6c5bbc	lazycat-app-publisher	88.0	89.8	keep	多维度	v1.5.2更新（app-interconnect/resource-export/import_resources）+ 输入验证表 + CLI前置检查 + 触发词扩展	dry_run
+2026-05-12T10:55	0e3622e	lazycat-app-publisher	89.8	92.3	keep	多维度	run_as(v1.6.0+) add: spec 4.5章节+strict-constraints+版本表+冲突警告；触发词扩展+docker/run_as/MCP 3项测试prompt全9-10分	full_test

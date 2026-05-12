@@ -1,6 +1,6 @@
 ---
 name: lazycat-app-publisher
-description: LazyCat v1.5.2+ 应用发布助手，支持智能 Docker Compose 转换、依赖分析、自动凭证生成、compose_override、高级路由、权限自动分析（binds路径→permissions声明）、应用间访问（.lzcx）、Skill/MCP 资源导出与导入。默认 LPK v2 格式。触发词：Docker Compose 转 LazyCat、发布应用到 LazyCat、创建 LPK 包、管理 LazyCat 应用生命周期、权限声明、应用间访问、MCP 导出、Skill 导出、import_resources、resource_exports。
+description: LazyCat v1.5.2+ 应用发布助手，支持智能 Docker Compose 转换、依赖分析、自动凭证生成、compose_override、高级路由、权限自动分析（binds路径→permissions声明）、应用间访问（.lzcx）、Skill/MCP 资源导出与导入、run_as 容器 UID/GID 配置。默认 LPK v2 格式。触发词：Docker Compose 转 LazyCat、发布应用到 LazyCat、创建 LPK 包、管理 LazyCat 应用生命周期、权限声明、应用间访问、MCP 导出、Skill 导出、import_resources、resource_exports、run_as、UID 映射、容器用户配置。
 preferences:
   - id: add_root_to_public_path
     name: 添加 / 到 public_path
@@ -1281,6 +1281,8 @@ services:
 | **environment 空值 (v1.4.2)** | `environment:` 空数组会报错 | 不要留空，删除字段或填写值 |
 | **compose_override 使用** | 需联系官方备案 | **⚠️ 检查点**：使用前提示用户联系开发者群或客服 |
 | **文档路径 (v1.5.0)** | `/lzcapp/document` 废弃 | 使用新路径 `/lzcapp/documents` |
+| **run_as 冲突 (v1.6.0)** | `application.run_as` 与 `user` 同时使用 | **⚠️ 强制警告**：run_as 不得与 user 在同一级别同时使用 |
+| **run_as + setup_script 冲突 (v1.6.0)** | `services.<name>.run_as` 与 `setup_script` 同时使用 | **⚠️ 强制警告**：service 级别 run_as 不得与 setup_script 同时使用 |
 
 ### 恢复流程
 
