@@ -398,89 +398,53 @@ ext_config:
 
 ### 添加用户使用的帮助文档
 
-有些软件在使用上需要给用户一些readme之类的东西，但是通过路由映射出来体验不好。可以通过404的handler来实现这一目的，但是帮助文件需要也映射相关的路径。
+#### 使用场景
 
-下面是一个例子
+很多应用会附带使用说明、README 或 Web 管理界面，通过 `/<path>` 提供静态文件访问。旧方案需要手写 HTML 模板配合 JS 跳转，不仅繁琐而且客户端跳转有闪烁问题。
 
-```yaml
-# package.yml（适用于 `lzcos v1.5.0+` / `LPK v2`）
-package: cloud.lazycat.app.mtranserver
-version: 1.1.1
-name: MTranServer
-description: 一个超低资源消耗超快的离线翻译服务器
-homepage: https://github.com/xxnuo/MTranServer
-author: xxnuo
-unsupported_platforms:
-  - ios
-  - android
-```
+**推荐方案**：通过 `injects` 的 response 阶段 + `upstreams` 实现服务端 302 重定向：
+
+- 用户访问任意不存在的路径 → 服务端返回 302 → 浏览器自动跳转到 `/help`
+- 帮助文档通过 `upstreams` 以 `file://` 方式提供，不需要额外写模板
+
+下面是一个完整示例（package.yml 按实际应用填写）：
 
 ```yaml
 # lzc-manifest.yml
 usage: "请在浏览器打开应用，通过程序域名+/help获取使用帮助"
 application:
-  subdomain: mtranserver
-  background_task: true
-  multi_instance: false
-  gpu_accel: false
-  kvm_accel: false
-  usb_accel: false
-  handlers:
-    error_page_templates:
-      404: /lzcapp/pkg/content/errors/404.html.tpl
+  subdomain: ask4me
+  upstreams:
+    - location: /help
+      backend: file:///lzcapp/pkg/content/web/index.html
+    - location: /
+      backend: http://ask4me:8080/
+  injects:
+    - id: redirect-404-to-help
+      on: response
+      auth_required: false
+      when:
+        - "/*"
+      do: |
+        if (ctx.status === 404) {
+          ctx.response.send(302, "", { location: "/help" });
+          return;
+        }
   public_path:
     - /
-  routes:
-    - /=http://mtranserver.cloud.lazycat.app.mtranserver.lzcapp:8989/
-    - /help=file:///lzcapp/pkg/content/
-    - /playground=file:///lzcapp/pkg/content/playground.html
+    - /help
 services:
-  mtranserver:
-    image: docker.hlmirror.com/xxnuo/mtranserver:1.1.1
-    binds:
-      - /lzcapp/var/config:/app/config
-      - /lzcapp/var/models:/app/models
-    setup_script: |
-      if [ -z "$(find /app/config/config.ini -mindepth 1 -maxdepth 1)" ]; then
-          cp  /lzcapp/pkg/content/config.ini /app/config/config.ini
-      fi
-      ln -sf /app/config/config.ini /app/config.ini
-      if [ ! -d /app/models/enzh ];then
-        cp -r /lzcapp/pkg/content/models/enzh /app/models/
-      fi
-      if [ ! -d /app/models/zhen ];then
-        cp -r /lzcapp/pkg/content/models/zhen /app/models/
-      fi
+  ask4me:
+    image: your-app-image:latest
 ```
 
-> 路由这里的 `- /=http://mtranserver.cloud.lazycat.app.mtranserver.lzcapp:8989/`
+> **说明：**
 >
-> 写成 `- /=http://mtranserver:8989/`也是可以的.
->
-> 如果要嵌入资源，需要在`lzc-build.yml`通过`contentdir`指定，详情参考[官方文档](https://developer.lazycat.cloud/spec/build.html)
-
-模板内容
-
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="MtranServer" content="width=device-width, initial-scale=1.0" />
-    <title>Redirecting...</title>
-    页面跳转中...
-    <script>
-      window.location.href = window.location.origin + "/help";
-    </script>
-  </head>
-  <body>
-    <p>
-      If you are not redirected automatically,
-      <a href=" ">click here</a >.
-    </p >
-  </body>
-</html>
-```
+> - `upstreams` 替代了旧的 `routes`，每个 location 独立配置 backend
+> - `injects` 替代了旧的 `handlers.error_page_templates` + JS 前端跳转方案
+> - `on: response` 阶段在收到上游响应后执行，可读取 `ctx.status` 进行服务端 302 重定向，比客户端 JS 跳转更可靠
+> - 帮助页面的路径（`/help`）需要同时在 `upstreams` 和 `public_path` 中声明
+> - 如果要嵌入资源，需要在 `lzc-build.yml` 通过 `contentdir` 指定，详情参考[官方文档](https://developer.lazycat.cloud/spec/build.html)
 
 ### 添加HealthCheck
 

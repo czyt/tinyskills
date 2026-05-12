@@ -1268,8 +1268,8 @@ services:
 
 | 异常类型 | 检测方法 | 处理方案 |
 |---------|---------|---------|
-| **应用启动失败** | 健康检查超时 | 1. 检查 `start_period` 设置<br>2. 使用 `handlers.error_page_templates` 自定义错误页<br>3. 查看容器日志排查 |
-| **502/404 错误** | HTTP 错误 | 配置错误页面模板：<br>`application.handlers.error_page_templates: {502: /lzcapp/pkg/content/errors/502.html.tpl}` |
+| **应用启动失败** | 健康检查超时 | 1. 检查 `start_period` 设置<br>2. 使用 `injects` 的 response 阶段自定义错误页<br>3. 查看容器日志排查 |
+| **502/404 错误** | HTTP 错误 | 通过 `injects` 的 response 阶段拦截并返回自定义页面（见下方示例） |
 | **服务依赖超时** | depends_on 等待失败 | 1. 检查依赖服务是否正常启动<br>2. 调整 `start_period` 时间<br>3. 检查 `healthcheck` 配置 |
 
 ### 兼容性警告
@@ -1302,30 +1302,69 @@ cat /lzcapp/run/manifest.yml
 # 手动删除失败的部署，重新执行 lzc-cli project release
 ```
 
-### 错误页面模板配置
+### 自定义错误页面与请求拦截（injects 方式）
 
-当应用出错时，可自定义错误页面：
+> ⚠️ `handlers.error_page_templates` 已废弃，请使用 `injects` 的 response 阶段实现自定义错误页面。
+
+#### 使用场景
+
+`injects` 的 `on: response` 阶段适用于以下场景：
+
+**场景一：帮助文件跳转** — 应用包含使用说明/帮助文档，用户访问不存在的页面时自动跳转到帮助页（代替旧版 handler+JS 重定向方案）。
 
 ```yaml
 # lzc-manifest.yml
 application:
-  handlers:
-    error_page_templates:
-      502: /lzcapp/pkg/content/errors/502.html.tpl
-      404: /lzcapp/pkg/content/errors/404.html.tpl
+  injects:
+    - id: redirect-404-to-help
+      on: response
+      auth_required: false
+      when:
+        - "/*"
+      do: |
+        if (ctx.status === 404) {
+          ctx.response.send(302, "", { location: "/help" });
+          return;
+        }
+  upstreams:
+    - location: /help
+      backend: file:///lzcapp/pkg/content/web/index.html
+    - location: /
+      backend: http://yourapp:8080/
+  public_path:
+    - /
+    - /help
 ```
 
-模板可使用 `{{ .ErrorDetail }}` 显示具体错误：
+> 配置要点：帮助页路径（`/help`）须同时出现在 `upstreams` 和 `public_path` 中，否则无法访问。
 
-```html
-<html>
-  <body>
-    <h1>应用发生错误</h1>
-    <p>失败原因: {{ .ErrorDetail}}</p>
-    <p>请稍后再试</p>
-  </body>
-</html>
+**场景二：自定义错误页面** — 应用后端返回 502/503 时，显示友好的错误提示而非浏览器默认白页：
+
+```yaml
+application:
+  injects:
+    - id: custom-error-pages
+      on: response
+      auth_required: false
+      when:
+        - "/*"
+      do: |
+        if (ctx.status === 502) {
+          ctx.response.send(200, { "content-type": "text/html; charset=utf-8" }, `
+            <html>
+              <body>
+                <h1>应用暂时不可用</h1>
+                <p>请稍后再试</p>
+              </body>
+            </html>
+          `);
+          return;
+        }
 ```
+
+**场景三：维护模式** — 在特定路径下拦截所有请求，返回维护公告页面。
+
+> 更多 injects 用法（CORS 修正、Basic Auth 注入、开发代理等）见 [references/injects.md](references/injects.md)。完整的帮助文档跳转示例见 [references/developer-guide.md](references/developer-guide.md)。
 
 ---
 
