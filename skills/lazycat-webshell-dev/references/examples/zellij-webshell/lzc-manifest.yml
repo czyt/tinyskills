@@ -1,0 +1,4 @@
+application:
+  subdomain: zellij-webshell
+  routes:
+    - /=exec://8080,/lzcapp/pkg/content/zellij-webshell

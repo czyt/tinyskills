@@ -1,0 +1,16 @@
+buildscript: |
+  set -eu
+  CONTENT_DIR="./dist/content"
+  ZELLIJ_BIN="${ZELLIJ_BIN:-$(command -v zellij || true)}"
+  if [ -z "$ZELLIJ_BIN" ]; then
+    echo "zellij binary not found. Set ZELLIJ_BIN=/path/to/zellij or install zellij in PATH." >&2
+    exit 1
+  fi
+  rm -rf "$CONTENT_DIR"
+  mkdir -p "$CONTENT_DIR"
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o "$CONTENT_DIR/zellij-webshell" .
+  cp "$ZELLIJ_BIN" "$CONTENT_DIR/zellij"
+contentdir: ./dist/content
+resource_exports:
+  - kind: lightos.webshell
+    source: ./resources/lightos.webshell

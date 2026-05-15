@@ -1,0 +1,13 @@
+package: cloud.lazycat.webshell.zellij
+version: 0.1.0
+name: Zellij WebShell
+description: Zellij-based LightOS WebShell provider
+min_os_version: v1.5.3-alpha.3
+hidden_from_launcher: true
+permissions:
+  required:
+    - lightos.manage
+locales:
+  zh:
+    name: Zellij WebShell
+    description: 基于 Zellij 的 LightOS WebShell provider

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "minimal-provider",
+    "prompt": "为一个语言无关的最小 LightOS WebShell provider 设计文件结构、LPK 配置和后端连接流程，可以用 Go 举例但不要把协议绑死到 Go。",
+    "expected": "输出 package.yml、lzc-build.yml、webshell-provider.json、实例 selector、lightosctl exec、PTY/WebSocket 抽象、可替换语言实现点和验证步骤；Go 代码片段应指向单独的 Go 实现参考。"
+  },
+  {
+    "id": "debug-discovery",
+    "prompt": "我的 LazyCat WebShell provider 安装后没有出现在 lightos-admin 的 provider 列表里，请给排查清单。",
+    "expected": "优先检查 resource_exports、resources/lightos.webshell/default/webshell-provider.json、kind/source 路径、LPK 构建结果和安装状态。"
+  },
+  {
+    "id": "zellij-adapter",
+    "prompt": "我想把目标 LightOS 实例里的 zellij web server 包成 WebShell provider，说明推荐架构、版本要求和转发方式。",
+    "expected": "建议把会话状态留在目标实例内，使用 lightosctl forward 和 provider 反向代理，说明 v1.5.3+ 要求、生命周期和 root_path/路由适配。"
+  },
+  {
+    "id": "full-example-selection",
+    "prompt": "我需要一个完整可参考的 WebShell provider 示例，想比较 demo-webshell、zellij-webshell 和 lazycat-microserver-webshell 应该选哪个。",
+    "expected": "引导读取 references/examples.md，说明三个完整源码目录的差异：最小 PTY、zellij 持久会话代理、Ghostty Web/microserver provider，并提醒协议语言无关。"
+  }
+]
