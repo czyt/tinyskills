@@ -1,6 +1,6 @@
 ---
 name: lazycat-webshell-dev
-description: Builds and reviews LazyCat/LightOS WebShell provider LPK apps, including lightos.webshell resource exports, provider metadata, instance selector routing, lightosctl exec/forward bridges, Catlink attach, and Publish API integration. Use when developing LazyCat WebShell providers, LightOS terminal providers, zellij/tmux webshell adapters, or debugging provider discovery and terminal connection issues.
+description: Builds and reviews LazyCat/LightOS WebShell provider LPK apps, including lightos.webshell resource exports, provider metadata, instance selector routing, lightosctl exec/forward bridges, Catlink attach, and Publish API integration. Use when developing LazyCat WebShell providers, LightOS terminal providers, zellij/tmux webshell adapters, or debugging provider discovery and terminal connection issues. 触发词：开发WebShell provider、WebShell调试、LightOS终端、zellij/tmux适配、lightosctl桥接。
 ---
 
 # LazyCat WebShell Dev
