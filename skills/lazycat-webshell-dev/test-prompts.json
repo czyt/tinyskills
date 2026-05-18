@@ -18,5 +18,30 @@
     "id": "full-example-selection",
     "prompt": "我需要一个完整可参考的 WebShell provider 示例，想比较 demo-webshell、zellij-webshell 和 lazycat-microserver-webshell 应该选哪个。",
     "expected": "引导读取 references/examples.md，说明三个完整源码目录的差异：最小 PTY、zellij 持久会话代理、Ghostty Web/microserver provider，并提醒协议语言无关。"
+  },
+  {
+    "id": "same-page-admin-return",
+    "prompt": "我做的 WebShell provider 从 lightos-admin 打开后，需要在同一个页面里提供返回 LightOS 首页的体验，不能新开标签，也不能硬编码 admin 域名，怎么设计？",
+    "expected": "要求后端用 lightosctl system admin-info --json 解析 base_url，前端构造 view=home 的 home URL，必要时 fallback 到可信跨源 referrer；跳转前保存 active selector/tab/pane，抑制 intentional navigation 的 beforeunload，然后用 location.assign 同页返回。"
+  },
+  {
+    "id": "session-restore",
+    "prompt": "WebShell 页面刷新或网络断开后要恢复原来的标签、分屏、pane 输出和正在运行的命令，请设计语言无关的会话管理协议。",
+    "expected": "输出稳定 selector/account/tab_id/pane_id、GET state、POST action、GET activity、ATTACH stream、history-replay-start/complete、selector+pane identity 校验、pending input 队列、revision 输入锁、online/focus/visibility 重连和账号授权。"
+  },
+  {
+    "id": "mobile-terminal-ux",
+    "prompt": "这个 LightOS WebShell 在手机浏览器上软键盘挡住终端、中文输入重复、没有 Tab/方向键，也不适合触摸选择，skill 应该指导我补哪些移动端能力？",
+    "expected": "覆盖 viewport-fit/safe-area/visualViewport/dvh、移动端快捷键、IME composition 预览和提交、touch selection handles、action sheet、browser back overview guard、orientation/keyboard 后重新 resize、无 hover 依赖和离线重连验证。"
+  },
+  {
+    "id": "launcher-and-key-mapping",
+    "prompt": "参考项目没有 hidden_from_launcher，而且我不清楚前端快捷键、手机按钮和终端输入应该怎样映射到后端，请按语言无关方式说明。",
+    "expected": "说明 hidden_from_launcher 只适合 provider-only；如果支持无 name 时自动选择 running 实例、实例切换和设置入口，就应保留 launcher 可见。按键映射应区分 terminal byte path 和 UI action path：普通输入/粘贴/IME提交/移动端 ANSI或CSI 字节发送 {type:input,data}，resize/input_lock/detach/ping 是控制消息，new_tab/split/close/rename 等是 workspace action，不写入 PTY。"
+  },
+  {
+    "id": "vt-boundary",
+    "prompt": "不同语言都有自己的 VT parser 或 terminal emulator，实现 LightOS WebShell 时 VT 应该放后端还是前端？",
+    "expected": "默认前端 VT renderer 负责解析和渲染，例如 xterm.js/Ghostty Web/WASM；后端只做 PTY/session broker、raw byte relay、resize/input_lock 控制和 raw history replay。只有服务端搜索、无客户端快照、协作一致性等明确需求才引入单一后端 headless VT，并说明避免前后端双 VT 分歧。"
   }
 ]

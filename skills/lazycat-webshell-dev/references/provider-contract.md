@@ -6,13 +6,13 @@ This reference distills the `webshell-provider-examples` repo into reusable impl
 
 WebShell providers are normal LPK apps. The protocol is language-neutral: any backend runtime can implement it if it can serve HTTP, handle WebSocket or streaming transport, run `lightosctl`, parse JSON, and manage processes or PTYs when terminal bridging is needed.
 
-lightos-admin discovers installed providers through `resource_exports`, then opens the provider entry URL with a LightOS instance selector:
+lightos-admin discovers installed providers through `resource_exports`, then opens the provider entry URL in the current browser context with a LightOS instance selector:
 
 ```text
 https://<provider-domain><root_path>?name=<name>@<owner_deploy_id>
 ```
 
-The provider must not depend on lightos-admin source code, private routes, or internal frontend state. The public contract is the provider app URL plus the `name` query parameter.
+The provider must not depend on lightos-admin source code, private routes, or internal frontend state. The public contract is the provider app URL plus the `name` query parameter; everything else should be resolved through documented platform commands or public endpoints.
 
 ## Required Files
 
@@ -41,7 +41,7 @@ Field rules:
 
 | Field | Rule |
 | --- | --- |
-| `support_home` | Third-party providers normally use `false`; lightos-admin opens the provider in a new page. |
+| `support_home` | Third-party providers normally use `false`; implement any return-home UX inside the provider page. |
 | `root_path` | Must start with `/`; it is appended to the provider app domain before `?name=...`. |
 
 If `root_path` is `/webshell/`, the backend must serve that prefix and assets/WebSocket/API paths must work under it. Prefer relative frontend URLs to reduce prefix bugs.
@@ -56,7 +56,6 @@ version: 0.1.0
 name: Example WebShell
 description: Example LightOS WebShell provider
 min_os_version: v1.5.2
-hidden_from_launcher: true
 permissions:
   required:
     - lightos.manage
@@ -66,7 +65,16 @@ locales:
     description: LightOS WebShell provider 示例
 ```
 
-Use `hidden_from_launcher: true` when the app only makes sense when launched from lightos-admin for a selected instance.
+Launcher visibility is a product decision:
+
+| Case | `hidden_from_launcher` |
+| --- | --- |
+| Provider-only app that cannot choose a default instance and only works with `?name=` from lightos-admin | `true` |
+| Full WebShell app that can open standalone, pick a running default instance, switch instances, and expose settings | omit or set `false` |
+
+The `lazycat-microserver-webshell` reference omits `hidden_from_launcher` because it supports standalone launch: if `?name=` is missing, the frontend loads instances, selects a running instance, writes the selector back into the URL, and then restores workspace state.
+
+Use `application.multi_instance: true` when the provider stores per-deployment workspace state, filters instances by deploy ID, or should behave differently for different installed copies. Multi-instance does not replace selector authorization; it only scopes the provider deployment.
 
 Minimal `lzc-build.yml` shape:
 
@@ -118,6 +126,29 @@ Validation requirements:
 - require both sides of `@`;
 - pass the full selector to `lightosctl`;
 - filter or visually disable instances whose `status` is not `running`.
+- authorize the selector against the current account/deploy context on every state, action, stream, forward, and publish request.
+
+Authorization requirements:
+
+- use the platform-provided current user/account signal when available, such as an account header injected by LightOS;
+- compare requested selector against `/lzcinit/lightosctl ps`;
+- prefer filtering by current provider deploy ID, then fall back to `admin-info.deploy_id` if the environment deploy ID is missing or stale;
+- return `401` for missing account context, `403` for cross-account selectors, and `400` for malformed selectors.
+
+## Same-Page lightos-admin Return
+
+The provider should let users return to lightos-admin without opening a new tab or guessing the admin domain.
+
+Language-neutral algorithm:
+
+1. Backend resolves admin info with `/lzcinit/lightosctl system admin-info --json`.
+2. Frontend asks the provider backend for `base_url`; do not let browser code guess or hardcode the admin host.
+3. Build a home URL from `base_url`, normally by setting `view=home` on the admin URL.
+4. If admin info is unavailable, fall back only to a trusted cross-origin `document.referrer` normalized to its origin root.
+5. Before navigating, persist active selector/tab/pane state and suppress intentional-navigation unload prompts.
+6. Navigate in the same page with `location.assign(homeURL)`.
+
+Do not use `window.open()` for normal return-home behavior. A WebShell provider is already launched from lightos-admin, so a new tab creates a split navigation stack and makes browser Back behavior unpredictable.
 
 ## Direct PTY Bridge
 
@@ -140,6 +171,68 @@ Terminal sizing:
 
 Use binary WebSocket messages for terminal bytes when practical. Text control messages such as `input:` and `resize:` are fine if the backend has an explicit protocol.
 
+## Frontend Key Mapping
+
+Keep a single explicit mapping from browser events to backend messages. Do not let the terminal renderer, mobile shortcut bar, and desktop shortcuts invent separate protocols.
+
+Terminal byte path:
+
+1. Terminal renderer emits bytes from normal keyboard input, paste, IME commit, or generated terminal responses.
+2. Mobile shortcut buttons encode keys/modifiers into terminal bytes before sending:
+   - Tab: `\t`
+   - Shift+Tab: `\x1b[Z`
+   - Return: `\r`
+   - Esc: `\x1b`
+   - Backspace: `\x7f`
+   - Delete: `\x1b[3~`
+   - arrows/home/end: CSI sequences such as `\x1b[A` or modified `\x1b[1;<modifier>A`
+   - Ctrl letters: control bytes such as Ctrl+C `\x03`
+   - Alt keys: ESC-prefixed bytes such as Alt+X `\x1bx`
+3. Client queues bytes until history replay completes, then sends a control frame:
+
+```json
+{"type":"input","data":"...terminal bytes..."}
+```
+
+4. Backend writes `data` unchanged to the PTY/stdin unless input is locked.
+
+Control path:
+
+| Frontend event | Backend message/action |
+| --- | --- |
+| Terminal resize | stream control `{"type":"resize","cols":120,"rows":32}` |
+| Input lock during reload | stream control `{"type":"input_lock","blocked":true}` |
+| Intentional detach | stream control `{"type":"detach"}` |
+| Ping/keepalive | stream control `{"type":"ping"}` and `{"type":"pong"}` |
+| New/close/rename/move tab, split pane, select pane | workspace action endpoint, not terminal stdin |
+| Copy/search/select-all/theme/instance switch | frontend-only UI action unless it changes workspace state |
+
+Desktop shortcuts should map to named frontend actions first, for example `new_tab`, `vertical_split`, or `copy_terminal`. Only shortcuts that represent terminal input should become bytes. This prevents Ctrl+Shift+T from being accidentally sent to the shell when the user meant "new tab".
+
+## VT Parser and Renderer Boundary
+
+For an interactive browser WebShell, VT parsing and rendering should normally live in the frontend. Use a browser terminal renderer such as xterm.js, Ghostty Web/WASM, hterm, or another proven VT renderer. The backend should stay a PTY/session broker:
+
+- start or attach to the PTY/session;
+- relay raw bytes without ANSI/CSI rewriting;
+- apply resize and input-lock control messages;
+- store bounded raw history for replay;
+- expose workspace metadata such as tabs, panes, cwd, command, busy state, and server revision.
+
+Do not implement a separate backend VT parser just because the backend language has a VT package. Two independent VT interpreters easily diverge on alternate screen, bracketed paste, mouse tracking, OSC sequences, wide glyphs, emoji, CJK width, and application cursor modes.
+
+Use backend headless VT only when there is a concrete server-side need:
+
+| Need | Recommendation |
+| --- | --- |
+| Browser display | Frontend VT renderer. |
+| Refresh/reconnect history | Store raw output and replay to the frontend renderer. |
+| Search/copy current buffer | Prefer frontend renderer APIs; use backend VT only if search must work while no client is attached. |
+| Collaboration/shared snapshots | Pick one backend headless VT as source of truth and treat the frontend as a renderer of snapshots plus live deltas. |
+| Existing web terminal adapter | Let the adapted web terminal own its VT/rendering; provider only forwards/proxies. |
+
+If a backend VT is required, make it an explicit architecture decision, choose one library for the whole provider, document unsupported escape sequences, and test it against the frontend renderer with recorded byte streams.
+
 ## Persistent Sessions
 
 Provider process restarts should not destroy user work. Prefer keeping session state inside the target LightOS instance:
@@ -149,6 +242,63 @@ Provider process restarts should not destroy user work. Prefer keeping session s
 - instance-local shell history and working directory state.
 
 The provider LPK backend should mainly serve UI, discover sessions, attach to existing sessions, and proxy traffic.
+
+Minimum restore contract:
+
+| Endpoint/Message | Purpose |
+| --- | --- |
+| `GET workspace state` | Return selector, server revision, active tab, tab order, layouts, panes, cwd/command metadata. |
+| `POST workspace action` | Apply create/close/rename/move/split/activate actions and return the updated state. |
+| `GET workspace activity` | Refresh busy flags, command names, cwd, and exited panes without rebuilding UI. |
+| `ATTACH stream` | Attach to a stable pane ID and stream terminal I/O. |
+
+Client restore rules:
+
+- restore tabs and panes from state before opening streams;
+- keep `tab_id` in the URL when possible and remember the last tab per selector in local storage;
+- keep a short-lived restart tab in session storage before intentional reloads;
+- reconnect visible panes on `online`, `focus`, and `visibilitychange`;
+- queue user input until history replay is complete, with a hard size limit.
+
+History replay rules:
+
+- send a `history-replay-start` control frame before buffered output;
+- include selector and pane ID in replay control frames;
+- send replayed output as terminal bytes, chunked to bounded sizes;
+- send `history-replay-complete` before accepting queued user input;
+- close and refetch state if replay identity does not match the requested selector/pane.
+
+Server/runtime revision rules:
+
+- expose a monotonic content/runtime revision to the client;
+- when a revision change requires reload, lock terminal input before prompting;
+- preserve the active selector and tab before reload;
+- clear the input lock once the refreshed client reconnects.
+
+Multi-device note: one PTY normally has one active cols/rows size. If multiple clients attach to the same pane, resize to the actively interacting device and document that passive viewers may see terminal wrapping change.
+
+## Mobile Terminal UX
+
+A mobile WebShell must be designed as a touch terminal, not a shrunken desktop terminal.
+
+Required behavior:
+
+- use `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`;
+- account for safe-area insets on top/bottom/left/right;
+- avoid fixed `100vh` for the terminal body; use `100dvh` or a visual viewport variable updated on keyboard/orientation changes;
+- provide touch shortcuts for Tab, Return, arrows, Esc, Ctrl/Alt/Shift, copy/paste/search, split, tab switching, and menu actions;
+- make all actions reachable without hover, right click, or a hardware keyboard;
+- handle CJK IME composition with a separate preview or equivalent state so intermediate composition text is not sent repeatedly to the terminal;
+- handle mobile selection with long press, draggable handles, and a touch-friendly action sheet;
+- intercept mobile browser Back only for in-app overlays such as tab overview; never trap users on the page permanently;
+- remeasure and send terminal cols/rows after keyboard open/close, orientation change, visibility changes, and focus return.
+
+Recommended options:
+
+- pixel-level scroll for mobile when the terminal renderer supports it;
+- haptic/touch feedback toggle for shortcut keys;
+- compact tab overview with previews for multiple sessions;
+- a mobile close confirmation when panes or tabs have running commands.
 
 ## Forwarding Existing Web Terminals
 
@@ -248,7 +398,13 @@ DELETE <admin-base>/unsafe_api/publish/services/<id>
 | Instance list or shell fails | `package.yml` includes `lightos.manage`; backend runs inside LazyCat environment; `/lzcinit/lightosctl ps` works. |
 | Provider opens but assets or WS fail | `root_path`, `application.routes`, frontend relative paths, and WebSocket URL prefix match. |
 | Selector not found | URL contains `?name=<name>@<owner_deploy_id>`; backend does not split away `owner_deploy_id`. |
+| Cross-account instance access | Every state/action/attach/forward/publish path authorizes selector ownership before work starts. |
+| Return to admin opens extra tabs | Resolve `admin-info.base_url`, persist provider state, then use same-page `location.assign(<base>?view=home)`. |
+| Refresh loses tabs/panes | Workspace state lacks stable tab/pane IDs or restore happens after stream attach. |
+| Reconnect duplicates or scrambles output | History replay lacks start/complete markers or selector/pane identity validation. |
 | Resize is broken | Frontend sends terminal cols/rows on connect and resize; backend validates positive integers before `pty.Setsize`. |
+| Mobile keyboard covers terminal | Use visual viewport/safe-area sizing and remeasure terminal after keyboard transitions. |
+| IME duplicates characters | Keep composition state separate and send text only after committed input. |
 | Catlink status fails | Backend returns valid `admin-info`; frontend uses `/unsafe_api/webshell/catlink/provider-status` with `credentials: "include"`. |
 | Publish requests fail | Use only `/unsafe_api/publish/*`; include credentials; send multipart form data; provide stable `package_id` and full `app_url`. |
 

@@ -1,0 +1,3 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-05-18T09:19	baseline	lazycat-webshell-dev	-	75.1	baseline	-	初始干跑评估：已覆盖 provider 发现/exec/forward/Catlink/Publish，但缺少同页返回、会话恢复、移动端和按键映射细节	dry_run
+2026-05-18T09:19	working-tree	lazycat-webshell-dev	75.1	87.6	keep	边界条件+指令具体性	补充 hidden_from_launcher 条件、same-page return、session restore、mobile UX、frontend key mapping，并压缩主 SKILL.md 到 Darwin 体积阈值内	dry_run
