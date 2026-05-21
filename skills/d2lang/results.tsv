@@ -1,0 +1,3 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-05-21T12:55:37+08:00	baseline	d2lang	-	82.4	baseline	-	Darwin 8维干跑评估：结构清晰且命令具体，但安装副作用检查、layout可用性、失败恢复和响应输出约定不够明确	dry_run
+2026-05-21T12:59:00+08:00	working-tree	d2lang	82.4	89.2	keep	边界条件+检查点设计	增加安装dry-run门槛、关键澄清条件、Failure Handling、TALA可用性检查、SVG嵌入/salt说明和用户回答输出模式	dry_run

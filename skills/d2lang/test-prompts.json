@@ -1,0 +1,35 @@
+{
+  "skill_name": "d2lang",
+  "evals": [
+    {
+      "id": 1,
+      "name": "cli-architecture-svg",
+      "prompt": "我想用 D2 画一个 HTTP API 到 Postgres 的架构图，并导出 SVG。请给我可运行的 d2 文件和命令。",
+      "expected": "给出可验证的 .d2 源码，使用稳定 key 和 label，连接使用 key；包含 d2 validate、d2 fmt、d2 input.d2 out.svg；提醒用退出码判断成功。"
+    },
+    {
+      "id": 2,
+      "name": "automation-go-node",
+      "prompt": "我想在自动化脚本里生成 D2 图，最好能从 Go 或 Node 调用，顺便 watch 预览。D2 有什么 CLI 或编程用法？",
+      "expected": "优先推荐 CLI stdin/stdout 和 child process wrapper；给出 Go/Node 调 CLI 示例；watch 使用 d2 -w；说明 d2oracle 是 Go 图编辑 API，不是普通渲染首选。"
+    },
+    {
+      "id": 3,
+      "name": "ci-png-failure",
+      "prompt": "CI 里 d2 input.d2 out.png 报 failed to launch Chromium，为什么？我还能怎么导出？",
+      "expected": "说明 PNG/PDF 依赖 Playwright/Chromium；给出 npx playwright install --with-deps chromium；建议 SVG 作为轻量替代；强调检查 d2 退出码。"
+    },
+    {
+      "id": 4,
+      "name": "layout-theme-config",
+      "prompt": "这个 D2 图想用 ELK 布局、暗色主题、自定义 padding，并且在 CI 里覆盖主题，应该怎么写？",
+      "expected": "使用 vars.d2-config 配置 layout-engine/theme-id/dark-theme-id/pad；说明 d2 --layout/--theme 或 D2_LAYOUT/D2_THEME 会覆盖文件内配置；建议 d2 layout 和 d2 themes 查询。"
+    },
+    {
+      "id": 5,
+      "name": "sql-and-sequence",
+      "prompt": "用 D2 同时画数据库表外键关系和一段登录时序图，语法怎么组织？",
+      "expected": "包含 shape: sql_table、primary_key/foreign_key、objects.disk -> disks.id；包含 shape: sequence_diagram 并说明时序图内顺序重要、参与者可预声明。"
+    }
+  ]
+}
