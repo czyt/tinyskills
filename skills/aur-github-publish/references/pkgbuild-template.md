@@ -60,17 +60,42 @@ sha256sums_x86_64=('SKIP')
 
 ### 多架构
 
+**⚠️ 多架构源文件必须使用不同的本地文件名**。`updpkgsums` 统一处理所有架构的源文件，若本地文件名相同则后下载的覆盖先下载的，checksum 将与实际文件不匹配。使用 `"local-name::URL"` 语法为每个架构指定不同文件名，并在 `package()` 中通过 `case $CARCH` 选择。
+
 ```bash
 arch=('x86_64' 'aarch64')
 
-source_x86_64=("${url}/releases/download/v${pkgver}/${file}-x86_64.tar.gz")
-source_aarch64=("${url}/releases/download/v${pkgver}/${file}-aarch64.tar.gz")
+# ✅ 每个架构用不同的本地文件名
+source_x86_64=("${pkgname}-amd64::${url}/releases/download/v${pkgver}/${file}-x86_64.tar.gz")
+source_aarch64=("${pkgname}-arm64::${url}/releases/download/v${pkgver}/${file}-aarch64.tar.gz")
 
 sha256sums_x86_64=('SKIP')
 sha256sums_aarch64=('SKIP')
 
 package() {
-    install -Dm755 ${file} "${pkgdir}/usr/bin/${pkgname}"
+    case "$CARCH" in
+        x86_64)  _src="${pkgname}-amd64" ;;
+        aarch64) _src="${pkgname}-arm64" ;;
+    esac
+    install -Dm755 "${srcdir}/${_src}" "${pkgdir}/usr/bin/${pkgname}"
+}
+```
+
+**纯二进制（无压缩包）的多架构写法**：
+
+```bash
+source_x86_64=("${pkgname}-amd64::${url}/releases/download/v${pkgver}/${binary}-linux-amd64")
+source_aarch64=("${pkgname}-arm64::${url}/releases/download/v${pkgver}/${binary}-linux-arm64")
+
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+    case "$CARCH" in
+        x86_64)  _src="${pkgname}-amd64" ;;
+        aarch64) _src="${pkgname}-arm64" ;;
+    esac
+    install -Dm755 "${srcdir}/${_src}" "${pkgdir}/usr/bin/${pkgname}"
 }
 ```
 

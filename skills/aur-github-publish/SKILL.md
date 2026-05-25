@@ -258,7 +258,9 @@ package() {
 
 ### 多架构 PKGBUILD
 
-**⚠️ checksum 使用 'SKIP'，workflow 自动计算**
+**⚠️ 多架构源文件必须使用不同的本地文件名，否则 checksum 会出错**
+
+`updpkgsums` 会对所有架构的 source 统一下载计算 checksum。如果不同架构的源文件使用相同本地文件名（`::` 前半部分），后下载的会覆盖先下载的，导致 checksum 与实际文件不匹配。
 
 ```bash
 pkgname={pkgname}
@@ -266,14 +268,41 @@ pkgver={version}
 pkgrel=1
 arch=('x86_64' 'aarch64')
 
-source_x86_64=("{url}/releases/download/v${pkgver}/{file}-x86_64.tar.gz")
-source_aarch64=("{url}/releases/download/v${pkgver}/{file}-aarch64.tar.gz")
+# ✅ 正确：每个架构用不同的本地文件名（${pkgname}-amd64 / ${pkgname}-arm64）
+source_x86_64=("${pkgname}-amd64::${url}/releases/download/v${pkgver}/{file}-x86_64.tar.gz")
+source_aarch64=("${pkgname}-arm64::${url}/releases/download/v${pkgver}/{file}-aarch64.tar.gz")
+# ❌ 错误：同名文件会导致 checksum 不匹配
+# source_x86_64=("{url}/releases/download/v${pkgver}/{file}-x86_64.tar.gz")
+# source_aarch64=("{url}/releases/download/v${pkgver}/{file}-aarch64.tar.gz")
 
 sha256sums_x86_64=('SKIP')  # ✅ workflow 自动计算
 sha256sums_aarch64=('SKIP')  # ✅ workflow 自动计算
 
 package() {
-    install -Dm755 {binary} "${pkgdir}/usr/bin/{name}"
+    # 根据当前构建架构选择对应的源文件
+    case "$CARCH" in
+        x86_64)  _src="${pkgname}-amd64" ;;
+        aarch64) _src="${pkgname}-arm64" ;;
+    esac
+    install -Dm755 "${srcdir}/${_src}" "${pkgdir}/usr/bin/{name}"
+}
+```
+
+**纯二进制文件（无 tar.gz 解压）的多架构写法**：
+
+```bash
+source_x86_64=("${pkgname}-amd64::${url}/releases/download/v${pkgver}/{binary}-linux-amd64")
+source_aarch64=("${pkgname}-arm64::${url}/releases/download/v${pkgver}/{binary}-linux-arm64")
+
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+    case "$CARCH" in
+        x86_64)  _src="${pkgname}-amd64" ;;
+        aarch64) _src="${pkgname}-arm64" ;;
+    esac
+    install -Dm755 "${srcdir}/${_src}" "${pkgdir}/usr/bin/{name}"
 }
 ```
 

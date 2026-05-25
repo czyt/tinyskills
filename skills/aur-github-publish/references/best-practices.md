@@ -219,7 +219,34 @@ VERSION=$(curl -s https://api.github.com/repos/user/repo/releases/latest | jq -r
 - 运行 `namcap PKGBUILD` 检查
 - 查看应用文档确认依赖
 
-### 6. 权限问题
+### 6. 多架构源文件 checksum 不匹配
+
+**原因**: 多个架构的 source 使用了 `::` 指定的相同本地文件名。`updpkgsums` 下载所有架构的源文件到同一目录，后下载的会覆盖先下载的，导致 checksum 与实际文件不一致。
+
+❌ 错误写法 —— 不同架构的本地文件名相同：
+```bash
+source_x86_64=("${pkgname}::${url}/app-linux-amd64")
+source_aarch64=("${pkgname}::${url}/app-linux-arm64")
+# 两个都以 ${pkgname} 作为本地文件名，后下载的覆盖先下载的
+```
+
+**解决**: 每个架构使用不同的本地文件名，并在 `package()` 中用 `case $CARCH` 区分：
+
+```bash
+# ✅ 正确：不同架构使用不同的本地文件名
+source_x86_64=("${pkgname}-amd64::${url}/app-linux-amd64")
+source_aarch64=("${pkgname}-arm64::${url}/app-linux-arm64")
+
+package() {
+    case "$CARCH" in
+        x86_64)  _src="${pkgname}-amd64" ;;
+        aarch64) _src="${pkgname}-arm64" ;;
+    esac
+    install -Dm755 "${srcdir}/${_src}" "${pkgdir}/usr/bin/${pkgname}"
+}
+```
+
+### 7. 权限问题
 
 **原因**: deb 包解压后权限不正确
 **解决**:
