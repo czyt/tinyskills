@@ -25,7 +25,7 @@
 说明：
 
 1. **`LPK v2`** / `package.yml` 新流程以 `lzcos v1.5.0+` 为前提，构建需配合 `lzc-cli v2.0.0+`。
-2. 自 `LPK v2` 起，静态包元数据统一放入 `package.yml`，包括 `package`、`version`、`name`、`description`、`locales`、`author`、`license`、`homepage`、`min_os_version`、`unsupported_platforms`、`admin_only` 与 `permissions`。
+2. 自 `LPK v2` 起，静态包元数据统一放入 `package.yml`，包括 `package`、`version`、`name`、`description`、`locales`、`author`、`license`、`homepage`、`min_os_version`、`unsupported_platforms`、`admin_only`、`hidden_from_launcher` 与 `permissions`。
 3. `lzc-manifest.yml` 只保留运行结构字段：`application`、`services`、`ext_config`、`usage`。
 4. `LPK v1` 仍兼容旧布局，允许这些静态字段继续保留在 `lzc-manifest.yml` 顶层。
 5. 对于需要访问用户文稿的应用，必须在 `ext_config` 中声明 `enable_document_access: true`（v1.5.0+）。
@@ -352,6 +352,7 @@ locales:
 | `license` | `string` | 可选；许可证标识或链接 |
 | `homepage` | `string` | 可选；主页或反馈地址 |
 | `admin_only` | `bool` | 可选；是否仅管理员可见。若为 `true`，则不允许同时声明非空 `application.public_path` |
+| `hidden_from_launcher` | `bool` | 可选；是否从启动器隐藏应用入口（lzcos >= v1.5.3）。只影响启动器展示，不改变应用访问地址、权限或部署行为 |
 | `min_os_version` | `string` | 可选；要求的最低系统版本 |
 | `unsupported_platforms` | `[]string` | 可选；不支持的平台列表 |
 | `locales` | `map[string]PackageLocaleConfig` | 可选；多语言元数据 |
@@ -392,6 +393,7 @@ locales:
 | `lightos.manage` | 管理 LightOS | 允许应用管理全局 LightOS 实例，且可以创建超级权限的实例 |
 | `lzcapp.self_delegate` | 应用自委托 | 允许系统向当前应用下发用户票据（v1.5.2+，用于 app.<self>.lzcx） |
 | `lzcapp.user_delegate` | 用户委托 | 允许应用代表当前真实用户访问其他应用（v1.5.2+，用于 app.<target>.lzcx） |
+| `user.notify` | 通知用户 | 允许应用向用户发送通知（lzcos >= v1.6.0）。声明后容器内会注入 `/lzcinit/notify-send` 二进制 |
 
 **示例：**
 

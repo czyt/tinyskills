@@ -8,7 +8,7 @@
 
 - **密码填充与自动登录** - 见 [passwordless-login.md](passwordless-login.md)
 - **CORS/CSP 微调** - 按路径精确增删响应头
-- **替换浏览器文件对话框** - 接入 LazyCat 网盘文件选择流程
+- **替换浏览器文件对话框** - 接入 LazyCat 网盘文件选择流程（见 [file-picker-intercept.md](file-picker-intercept.md)）⚠️ 应用商店强制要求
 - **隐藏或修改页面元素** - 不改上游源码做 UI 适配
 - **高级路由** - 在 request/response 阶段结合 `ctx.proxy` 做动态反向代理
 - **请求头/响应头兼容修正** - 补充鉴权头、修正 WebSocket 头、清理冲突头

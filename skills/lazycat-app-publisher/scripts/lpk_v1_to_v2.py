@@ -14,6 +14,7 @@ If output is not specified, creates input-v2.lpk
 """
 
 import argparse
+import io
 import os
 import sys
 import tarfile
@@ -228,7 +229,6 @@ def convert_lpk(input_path: str, output_path: str) -> None:
 
         # Step 3: Create LPK v2
         print("Step 3: Creating LPK v2 (tar format)...")
-        import io
         create_v2_lpk(
             output_path,
             package_data,

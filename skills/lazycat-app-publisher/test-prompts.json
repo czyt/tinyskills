@@ -38,5 +38,10 @@
     "id": 8,
     "prompt": "这个 agent 应用需要读取系统中的 Skill 和 MCP provider，package.yml 中应该怎么配置？",
     "expected": "应在 package.yml 中添加 import_resources: [{kind: skills}, {kind: mcp-providers}]"
+  },
+  {
+    "id": 9,
+    "prompt": "帮我把这个 Excalidraw 的 docker-compose 转为 LazyCat 格式，应用有文件打开和保存功能：\nservices:\n  excalidraw:\n    image: excalidraw/excalidraw:latest\n    ports:\n      - \"80:80\"\n",
+    "expected": "应检测到文件操作功能，在 lzc-manifest.yml 中添加文件选择器拦截 inject（open-save-chooser），并提示需要将 lzc-file-chooser-inject.js 放入 content 目录"
   }
 ]

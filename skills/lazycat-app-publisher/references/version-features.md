@@ -28,6 +28,9 @@ This document maps LazyCat OS versions to their features, helping you determine 
 | **`resource_exports`** | **v1.5.2** | **`lzc-build.yml` 中配置 Skill/MCP 导出** |
 | **Skill / MCP export** | **v1.5.2** | **应用通过 `resources/` 目录提供 Skill/MCP** |
 | **`run_as` (UID/GID + owner 映射)** | **v1.6.0+** | **容器数字 UID/GID + `/lzcapp` 持久目录 owner 映射** ⭐ |
+| **`hidden_from_launcher`** | **v1.5.3** | **从启动器隐藏应用入口（不影响访问地址/权限/部署）** |
+| **`user.notify` 权限** | **v1.6.0** | **向用户发送通知，注入 `/lzcinit/notify-send` 二进制** |
+| **文件选择器拦截** | **v1.5.0+** | **应用商店强制要求：有上传/下载功能必须接入** ⭐ |
 
 ---
 
@@ -196,9 +199,19 @@ services:
 - Only accepts numeric UID/GID (`1000` or `"1000:1000"`)
 - Cannot be used with `user` or `setup_script` simultaneously
 - Each service can have its own `run_as` with independent owner views
+- **`user.notify` permission**: Allow apps to send user notifications via `/lzcinit/notify-send` binary
 
 **Required for:**
 - Multi-UID/GID applications needing persistent directory ownership
+- Apps needing to send user notifications
+
+### v1.5.3
+
+**New Features:**
+- **`hidden_from_launcher`**: Hide app entry from launcher (in `package.yml`)
+- Only affects launcher display, does not change app access URL, permissions, or deployment behavior
+
+### v1.5.2+
 
 ### v1.5.2
 
@@ -247,6 +260,9 @@ min_os_version: 1.3.8  # 如果使用 run_as 请设为 1.6.0+
 | Skill/MCP `resource_exports` | `1.5.2` |
 | Delegate permissions | `1.5.2` |
 | `run_as` (UID/GID owner 映射) | `1.6.0` |
+| `hidden_from_launcher` | `1.5.3` |
+| `user.notify` 权限 | `1.6.0` |
+| 文件选择器拦截（应用商店强制） | `1.5.0` |
 
 ---
 
