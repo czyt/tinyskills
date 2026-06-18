@@ -1,6 +1,6 @@
 ---
 name: lazycat-sdk-dev
-description: LazyCat SDK 开发技能，用于 Go/JS 应用与微服务 API 交互（用户、设备、应用、设备控制）。包含前端 WebShell 能力（AppCommon、MediaSession、主题、导航）。触发词：@lazycatcloud/sdk 导入、lzc-sdk 引用、SDK/WebShell/设备查询。
+description: LazyCat SDK 开发技能，用于 Go/JS 应用与微服务 API 交互（用户、设备、应用、设备控制）。包含前端 WebShell 能力（AppCommon、MediaSession、主题、导航）和系统通知推送（notification.Notify）。触发词：@lazycatcloud/sdk 导入、lzc-sdk 引用、SDK/WebShell/设备查询/通知推送/user.notify。
 ---
 
 # LazyCat SDK 开发
@@ -74,6 +74,7 @@ const api = new lzcAPIGateway(window.location.origin, false)
 | 设备控制(LED/重启) | `gw.Box` | [go-sdk.md#Box](references/go-sdk.md) |
 | 应用管理 | `gw.PkgManager` | [go-sdk.md#PkgManager](references/go-sdk.md) |
 | 前端客户端能力 | `AppCommon` | [frontend-extensions.md](references/frontend-extensions.md) |
+| 系统通知推送 | `notification.Notify` | [frontend-extensions.md#通知](references/frontend-extensions.md) |
 
 #### Step 2.2: 添加用户上下文（HTTP Handler 必须）
 
@@ -326,6 +327,7 @@ const isClient = isIOS || isAndroid
 | 状态栏颜色 | ❌ | ✅ | `lzc_window.SetStatusBarColor` |
 | 控制栏显隐 | ❌ | ✅ | `lzc_tab.SetControlViewVisibility` |
 | 主题模式 | ❌ | ✅ | `lzc_theme.getThemeMode` |
+| 系统通知推送 | ✅ | ✅ | `currentDevice.notification.Notify` |
 
 ### AppCommon 快速示例
 
@@ -341,6 +343,39 @@ await AppCommon.SetFullScreen()
 // 分享文件
 await AppCommon.ShareWithFiles("/path/to/file.pdf")
 ```
+
+### 系统通知快速示例
+
+```js
+import { lzcAPIGateway } from "@lazycatcloud/sdk"
+import base from "@lazycatcloud/sdk/dist/extentions/base"
+
+const api = new lzcAPIGateway(window.location.origin, false)
+
+// ⚠️ 检查点：非 WebShell 环境跳过
+if (base.isIosWebShell() || base.isAndroidWebShell()) {
+  try {
+    const device = await api.currentDevice
+    // ⚠️ 检查点：确认 notification 能力可用
+    if (device?.notification?.Notify) {
+      await device.notification.Notify({
+        title: "任务完成",
+        body: "导入任务已经处理完成",
+        deeplinkUrl: "lzc://app/cloud.lazycat.app.demo",
+      })
+    }
+  } catch (err) {
+    console.error("[notification] send failed:", err)
+  }
+}
+```
+
+**⚠️ 前置条件**：`package.yml` 需声明 `user.notify` 权限（lzcos >= v1.6.0）
+
+**❌ 不要做**：
+- 不要在非 WebShell 环境直接调用（`device.notification` 为 undefined）
+- 不要高频循环推送（系统可能限流）
+- 不要把通知当数据同步通道（仅用于用户感知提醒）
 
 详见 [references/frontend-extensions.md](references/frontend-extensions.md)
 
@@ -384,6 +419,9 @@ const files = await pickFiles({
 | 用户上下文缺失 | HTTP Handler 未传递 headers | 添加 `metadata.AppendToOutgoingContext` |
 | defer gw.Close() 未执行 | panic 或提前退出 | 确保 defer 在创建后立即调用 |
 | 前端环境判断错误 | 在非 WebShell 中调用原生能力 | 先用 `isIosWebShell()`/`isAndroidWebShell()` 判断 |
+| 通知发送失败（无权限） | `package.yml` 未声明 `user.notify` | 检查 permissions 配置，确认 lzcos >= v1.6.0 |
+| 通知发送失败（版本过低） | lzcos < v1.6.0 | 提示用户升级系统 |
+| 通知不可达 | 设备离线或网络异常 | try/catch 捕获，降级为页面内提示 |
 
 ### 边界条件处理
 

@@ -61,6 +61,7 @@ export function safeCall(fn, fallback) {
 | 获取控制栏状态 | Android | `lzc_tab.GetControlViewVisibility` |
 | WebView 跟随键盘 resize | Android | `lzc_window.EnableWebviewResize` |
 | 客户端主题模式 | Android | `lzc_theme.getThemeMode` / `setThemeMode` |
+| 系统通知推送 | iOS / Android / 桌面 | `currentDevice.notification.Notify` |
 
 ---
 
@@ -651,7 +652,136 @@ setAndroidThemeMode(ThemeMode.FOLLOW_SYSTEM, applyMode ?? 0)
 
 ---
 
-## 6. 推荐接入顺序
+## 6. 系统通知（全平台适配）
+
+### 6.1 概述
+
+LazyCat 提供系统级通知能力，应用可以向用户发送通知。支持 Android、iOS、macOS、Windows、Linux。
+
+**⚠️ 前置条件**：`package.yml` 需声明 `user.notify` 权限，要求 `lzcos >= v1.6.0`。
+
+```yaml
+# package.yml
+permissions:
+  required:
+    - user.notify
+```
+
+声明该权限后，应用容器内会注入 `/lzcinit/notify-send` 二进制。
+
+### 6.2 推荐入口
+
+| 场景 | 入口 |
+|------|------|
+| 向当前设备推送 | `currentDevice.notification.Notify(request)` |
+| 向指定设备推送 | `getDeviceProxy(uniqueDeviceId).notification.Notify(request)` |
+
+### 6.3 Request 字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `title` | `string` | ✅ | 通知标题 |
+| `body` | `string` | ✅ | 通知正文 |
+| `deeplinkUrl` | `string` | ❌ | 用户点击通知后打开的 deeplink URL |
+
+### 6.4 示例：向当前设备推送通知
+
+```js
+import { lzcAPIGateway } from "@lazycatcloud/sdk"
+
+const lzcapi = new lzcAPIGateway(window.location.origin, false)
+
+export async function notifyCurrentDevice() {
+  const device = await lzcapi.currentDevice
+  await device.notification.Notify({
+    title: "任务完成",
+    body: "导入任务已经处理完成",
+    deeplinkUrl: "lzc://app/cloud.lazycat.app.demo",
+  })
+}
+```
+
+### 6.5 示例：列出设备并向指定设备推送
+
+```js
+import { lzcAPIGateway } from "@lazycatcloud/sdk"
+
+const lzcapi = new lzcAPIGateway(window.location.origin, false)
+
+export async function listCurrentUserDevices() {
+  const session = await lzcapi.session
+  const reply = await lzcapi.devices.ListEndDevices({ uid: session.uid })
+  return reply.devices
+}
+
+export async function notifyDevice(uniqueDeviceId) {
+  const devices = await listCurrentUserDevices()
+  const target = devices.find((device) => {
+    return device.isOnline && device.uniqueDeivceId === uniqueDeviceId
+  })
+  if (!target) {
+    throw new Error(`device not found or offline: ${uniqueDeviceId}`)
+  }
+  const device = await lzcapi.getDeviceProxy(target.uniqueDeivceId)
+  await device.notification.Notify({
+    title: "新消息",
+    body: "你有一条来自轻应用的新消息",
+  })
+}
+```
+
+### 6.6 投递方式说明
+
+具体投递方式由系统决定，可能是：
+- 客户端系统通知
+- 站内消息
+- 信箱
+- 其他用户可感知的通知通道
+
+### 6.7 常见错误
+
+| 错误 | 原因 | 修复 |
+|------|------|------|
+| `device.notification` 为 undefined | 未声明 `user.notify` 权限或 lzcos < v1.6.0 | 检查 `package.yml` permissions 和系统版本 |
+| 通知发送抛异常 | 设备离线或网络不可达 | try/catch 包裹，降级为页面内提示 |
+| 通知无响应 | 高频推送被系统限流 | 控制发送频率，不要循环调用 |
+| 浏览器中调用失败 | 非 WebShell 环境无 notification 能力 | 先判断 `isClientWebShell()` 再调用 |
+
+### 6.8 错误处理示例
+
+```js
+import { lzcAPIGateway } from "@lazycatcloud/sdk"
+import base from "@lazycatcloud/sdk/dist/extentions/base"
+
+const lzcapi = new lzcAPIGateway(window.location.origin, false)
+
+export async function safeNotify(title, body) {
+  // ⚠️ 检查点：非 WebShell 环境跳过
+  if (!base.isIosWebShell() && !base.isAndroidWebShell()) {
+    console.warn("[notification] not in WebShell, skip")
+    return false
+  }
+
+  try {
+    const device = await lzcapi.currentDevice
+    // ⚠️ 检查点：确认 notification 能力可用
+    if (!device?.notification?.Notify) {
+      console.warn("[notification] Notify not available, check user.notify permission")
+      return false
+    }
+
+    await device.notification.Notify({ title, body })
+    return true
+  } catch (err) {
+    console.error("[notification] send failed:", err)
+    return false
+  }
+}
+```
+
+---
+
+## 7. 推荐接入顺序
 
 1. 先加平台判断 (`isIosWebShell`, `isAndroidWebShell`)
 2. 再加 `lzcapp-disable-dark` meta
@@ -660,12 +790,13 @@ setAndroidThemeMode(ThemeMode.FOLLOW_SYSTEM, applyMode ?? 0)
 5. 如果页面需要沉浸展示，再接全屏接口
 6. 如果页面是播放器，再接 Android `MediaSession`
 7. 如果页面是 Android 宿主内页面，再按需接状态栏颜色、控制栏显隐、主题模式
+8. 如果需要向用户推送通知，接 `notification.Notify`（需 `user.notify` 权限）
 
 ---
 
-## 7. 常见组合示例
+## 8. 常见组合示例
 
-### 7.1 沉浸式详情页
+### 8.1 沉浸式详情页
 
 **适用平台：** iOS / Android
 
@@ -685,7 +816,7 @@ import { AppCommon } from "@lazycatcloud/sdk/dist/extentions"
 await AppCommon.SetFullScreen()
 ```
 
-### 7.2 iOS 文件选择 / 图片预览页
+### 8.2 iOS 文件选择 / 图片预览页
 
 **建议组合：**
 - iOS 关闭按钮显隐
@@ -713,7 +844,7 @@ function onPreviewClose() {
 }
 ```
 
-### 7.3 Android 音频播放页
+### 8.3 Android 音频播放页
 
 **建议组合：**
 - `MediaSession.setMetadata`
@@ -746,7 +877,7 @@ export async function bindAudioSession(audio, title) {
 
 ---
 
-## 8. 兼容性建议
+## 9. 兼容性建议
 
 - 所有宿主能力都做存在性判断，不要假设每个环境都已注入
 - meta 类能力推荐在页面初始 HTML 中直接声明
@@ -756,5 +887,5 @@ export async function bindAudioSession(audio, title) {
 
 ---
 
-**最后更新**: 2026-04-14
+**最后更新**: 2026-06-18
 **基于**: 懒猫开发者文档 advanced-frontend-app-dev.md

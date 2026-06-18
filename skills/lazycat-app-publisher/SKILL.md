@@ -82,6 +82,7 @@ preferences:
 | [references/docker-compose-examples.md](references/docker-compose-examples.md) | Docker Compose 转换示例 |
 | [references/docker-run-examples.md](references/docker-run-examples.md) | Docker Run 转换示例 |
 | [references/real-world-examples.md](references/real-world-examples.md) | 真实项目示例 |
+| [references/store-rule.md](references/store-rule.md) | ⭐ 应用商店审核规则 - 激励标准、禁止类型、上架要求 |
 | [references/developer-guide.md](references/developer-guide.md) | 社区开发指南 - Go SDK、裸应用、网络配置、调试技巧 |
 
 ---
