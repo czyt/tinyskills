@@ -45,7 +45,7 @@ curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg={pkgname}" | jq -r '.r
 
 【方案 B】传统手动发布
 - 手动克隆 AUR 仓库
-- 创建 PKGBUILD 和 .SRCINFO
+- 创建 PKGBUILD（不要创建 .SRCINFO，GitHub Action 自动生成）
 - 手动推送创建仓库
 - 需要熟悉 AUR 操作
 
@@ -202,7 +202,7 @@ gh workflow run update-{pkgname}.yml
          │    │
          │    └─→ 方案 B: 传统手动发布
          │         ├─→ 克隆 AUR 仓库
-         │         ├─→ 创建 PKGBUILD + .SRCINFO
+         │         ├─→ 创建 PKGBUILD（Action 自动生成 .SRCINFO）
          │         ├─→ 手动推送
          │         └─→ 后续使用 workflow 更新
 ```

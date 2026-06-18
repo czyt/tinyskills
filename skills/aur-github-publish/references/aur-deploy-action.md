@@ -210,27 +210,22 @@ cp ~/your-project/myapp-bin/PKGBUILD .
 cp ~/your-project/myapp-bin/myapp-bin.install .
 ```
 
-### 步骤 3: 生成 .SRCINFO
-
-```bash
-# 生成源信息文件
-makepkg --printsrcinfo > .SRCINFO
-```
-
-### 步骤 4: 配置并推送
+### 步骤 3: 配置并推送
 
 ```bash
 # 配置 git 用户信息
 git config user.name "your-aur-username"
 git config user.email "your@email.com"
 
-# 提交
-git add PKGBUILD .SRCINFO *.install
+# 提交（不要提交 .SRCINFO，GitHub Action 会自动生成）
+git add PKGBUILD *.install
 git commit -m "Initial commit: myapp-bin v1.0.0"
 
 # 推送（首次推送创建仓库）
 git push origin master
 ```
+
+**❌ 禁止在 PKGBUILD 同目录创建 `.SRCINFO`**。GitHub Action 会在推送时自动生成并同步到 AUR。
 
 ### 步骤 5: 配置 GitHub Actions
 

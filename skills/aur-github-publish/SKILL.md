@@ -54,8 +54,7 @@ description: AUR GitHub 发布助手 - 自动更新 PKGBUILD 版本、发布到 
 aur-repo/
 ├── {pkgname}/
 │   ├── PKGBUILD           # 包构建文件
-│   ├── {pkgname}.install  # 安装钩子（可选）
-│   └── .SRCINFO           # 源信息（自动生成）
+│   └── {pkgname}.install  # 安装钩子（可选）
 ├── .github/
 │   ├── workflows/
 │   │   ├── update-{pkgname}.yml
@@ -693,18 +692,20 @@ cd /tmp/{pkgname}
 # 3. 创建 PKGBUILD（可以从模板复制）
 cp ~/your-project/PKGBUILD .
 
-# 4. 生成 .SRCINFO
+# 4. 生成 .SRCINFO（仅用于推送到 AUR，不要提交到 GitHub 仓库）
 makepkg --printsrcinfo > .SRCINFO
 
 # 5. 配置 git 用户信息
 git config user.name "your-aur-username"
 git config user.email "your@email.com"
 
-# 6. 提交并推送
-git add PKGBUILD .SRCINFO
+# 6. 提交并推送到 AUR（注意：只提交 PKGBUILD，不提交 .SRCINFO）
+git add PKGBUILD
 git commit -m "Initial commit: {pkgname}"
 git push origin master
 ```
+
+**⚠️ 关键检查点**: `.SRCINFO` 仅用于首次推送到 AUR 时让 AUR 索引正确。**不要将 `.SRCINFO` 提交到 GitHub 仓库**——后续更新由 GitHub Action 自动生成 `.SRCINFO` 并推送到 AUR。
 
 **注意**: GitHub Actions workflow 只能推送修改，不能创建新仓库。首次发布必须手动完成以上步骤。
 
@@ -751,7 +752,7 @@ curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg={pkgname}" | jq -r '.r
 
 【方案 B】传统手动发布
 - 手动克隆 AUR 仓库
-- 创建 PKGBUILD 和 .SRCINFO
+- 创建 PKGBUILD（GitHub Action 自动生成 .SRCINFO）
 - 手动 SSH 推送创建仓库
 - 需要熟悉 AUR 操作流程
 
@@ -896,7 +897,7 @@ curl -s "https://aur.archlinux.org/packages/{pkgname}" | grep -q "Package Detail
 如果包不存在：
 「⚠️ 该包在 AUR 中不存在，首次发布需要手动操作：
 1. 克隆空仓库: git clone ssh://aur.archlinux.org/{pkgname}.git
-2. 添加 PKGBUILD 和 .SRCINFO
+2. 添加 PKGBUILD（不要添加 .SRCINFO，GitHub Action 会自动生成）
 3. 推送创建仓库
 
 是否需要我提供详细步骤？」
@@ -954,9 +955,6 @@ GitHub Actions workflow 通过 updpkgsums: true 自动计算。
 ```bash
 # 验证 PKGBUILD
 namcap PKGBUILD
-
-# 生成 .SRCINFO
-makepkg --printsrcinfo > .SRCINFO
 ```
 
 **⚠️ 检查点**: 验证失败时询问用户：
@@ -969,8 +967,10 @@ makepkg --printsrcinfo > .SRCINFO
 
 #### Step 3.2: 提交到 GitHub 仓库
 
+**❌ 禁止在 PKGBUILD 同目录创建 `.SRCINFO`**。GitHub Action 会在推送时自动生成 `.SRCINFO` 并同步到 AUR，本地完全不需要这个文件。
+
 ```bash
-git add {pkgname}/PKGBUILD {pkgname}/.SRCINFO .github/workflows/update-{pkgname}.yml
+git add {pkgname}/PKGBUILD .github/workflows/update-{pkgname}.yml
 git commit -m "feat: add {pkgname} AUR package with auto-update workflow"
 git push
 ```
@@ -1143,9 +1143,6 @@ namcap myapp-bin-1.0.0-1-x86_64.pkg.tar.zst
 ### 本地验证
 
 ```bash
-# 生成 .SRCINFO
-makepkg --printsrcinfo > .SRCINFO
-
 # 验证 PKGBUILD
 namcap PKGBUILD
 
@@ -1228,7 +1225,7 @@ package() {
 2. **缺少依赖声明**: 导致安装失败
 3. **跳过验证**: 不运行 namcap
 4. **忽略错误**: curl 失败不检查
-5. **不更新 .SRCINFO**: AUR 无法正确索引
+5. **🚨 在 PKGBUILD 同目录创建 `.SRCINFO`**: 完全不需要！GitHub Action 会自动生成并推送到 AUR。本地创建 `.SRCINFO` 只会造成冲突和混乱。**永远不要手动 `makepkg --printsrcinfo > .SRCINFO` 或 `git add .SRCINFO`**
 
 ---
 

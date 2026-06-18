@@ -294,9 +294,6 @@ optdepends=(
 ## 本地验证命令
 
 ```bash
-# 生成 .SRCINFO
-makepkg --printsrcinfo > .SRCINFO
-
 # 验证 PKGBUILD
 namcap PKGBUILD
 

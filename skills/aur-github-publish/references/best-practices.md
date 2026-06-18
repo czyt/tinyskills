@@ -14,11 +14,8 @@ cd /tmp/myapp-bin
 # 添加 PKGBUILD
 cp ~/your-project/PKGBUILD .
 
-# 生成 .SRCINFO
-makepkg --printsrcinfo > .SRCINFO
-
-# 推送
-git add PKGBUILD .SRCINFO
+# 推送（不要创建 .SRCINFO，GitHub Action 会自动生成）
+git add PKGBUILD
 git commit -m "Initial commit"
 git push origin master
 ```
@@ -157,17 +154,21 @@ pkgver=1.1.0
 pkgrel=1  # ✅ 正确
 ```
 
-### 5. 不更新 .SRCINFO
+### 5. 🚨 在本地创建 .SRCINFO
 
-❌ 只更新 PKGBUILD:
+**❌ 永远不要在 PKGBUILD 同目录创建 `.SRCINFO`**：
+
 ```bash
-sed -i "s/^pkgver=.*/pkgver=$NEW_VERSION/" PKGBUILD
-git push  # ❌ .SRCINFO 未更新
+# ❌ 错误：本地生成 .SRCINFO 并提交
+makepkg --printsrcinfo > .SRCINFO
+git add .SRCINFO
 ```
 
-✅ workflow 自动更新:
+**原因**：GitHub Action 会在推送时自动生成 `.SRCINFO` 并推送到 AUR。本地创建只会造成冲突和混乱。
+
+✅ 正确做法：只提交 PKGBUILD，workflow 自动处理 `.SRCINFO`：
 ```yaml
-updpkgsums: true  # 自动生成 .SRCINFO
+updpkgsums: true  # Action 自动生成 .SRCINFO
 ```
 
 ---
