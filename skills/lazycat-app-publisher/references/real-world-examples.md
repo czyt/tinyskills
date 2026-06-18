@@ -407,6 +407,71 @@ services:
 
 ---
 
+## 7. Ask4Me (Help Page Redirect + Injects + Conditional Template)
+
+### Key Patterns Demonstrated
+- **404 → 帮助页自动跳转**：通过 `injects` response 阶段拦截 404，重定向到静态帮助页
+- **静态文件服务**：`file:///lzcapp/pkg/content/web/index.html` 直接从包内容提供 HTML
+- **public_path 必须同时包含 `/` 和 `/help`**：否则 `/help` 路径无法访问
+- **条件模板带 fallback**：`{{if .U.base_url}}...{{else}}https://{{.S.AppDomain}}{{end}}`
+- **usage 字段为纯字符串**：正确格式，不使用嵌套结构
+
+### LazyCat Implementation
+```yaml
+application:
+  subdomain: ask4me
+  upstreams:
+    - location: /help
+      backend: file:///lzcapp/pkg/content/web/index.html
+    - location: /
+      backend: http://ask4me:8080/
+  injects:
+    - id: redirect-404-to-help
+      on: response
+      auth_required: false
+      when:
+        - "/*"
+      do: |
+        if (ctx.status === 404) {
+          ctx.response.send(302, "", { location: "/help" });
+          return;
+        }
+  public_path:
+    - /
+    - /help
+
+services:
+  ask4me:
+    # easychen/ask4me:0.2.4
+    image: registry.lazycat.cloud/czyt/easychen/ask4me:090e4b934df935e8
+    environment:
+      - ASK4ME_BASE_URL={{if .U.base_url}}{{.U.base_url}}{{else}}https://{{.S.AppDomain}}{{end}}
+      - ASK4ME_API_KEY={{.U.api_key}}
+      - ASK4ME_SERVERCHAN_SENDKEY={{.U.serverchan_sendkey}}
+      - ASK4ME_APPRISE_URLS={{.U.apprise_urls}}
+      - ASK4ME_APPRISE_BIN={{.U.apprise_bin}}
+      - ASK4ME_SQLITE_PATH=/data/ask4me.db
+      - ASK4ME_LISTEN_ADDR=:8080
+    binds:
+      - /lzcapp/var/data:/data
+
+usage: |
+  Ask4Me forwards your questions to an AI backend and delivers answers via notification channels (ServerChan or Apprise).
+
+  1. Set your API key and at least one notification channel (ServerChan or Apprise) during deployment.
+  2. Submit questions via the API.
+  3. Receive answers through your configured notification channel.
+```
+
+**Key Features:**
+- 帮助页路由：`/help` → 静态 HTML，`/` → 后端服务
+- 404 自动跳转：用户访问不存在的路径时自动重定向到帮助页
+- ⚠️ `public_path` 必须包含 `/help`，否则 injects 无法访问帮助页
+- 条件模板：`base_url` 未配置时自动使用 `{{.S.AppDomain}}` 拼接
+- SQLite 数据持久化到 `/lzcapp/var/data`
+
+---
+
 ## Key Patterns from Real Applications
 
 ### 1. **Image Sources**
@@ -515,6 +580,35 @@ locales:
 ```yaml
 application:
   background_task: true  # Prevents auto-sleep
+```
+
+### 11. **Injects (Response Phase - 404 Redirect)**
+```yaml
+application:
+  injects:
+    - id: redirect-404-to-help
+      on: response
+      auth_required: false
+      when:
+        - "/*"
+      do: |
+        if (ctx.status === 404) {
+          ctx.response.send(302, "", { location: "/help" });
+          return;
+        }
+```
+
+### 12. **Static Help Page**
+```yaml
+application:
+  upstreams:
+    - location: /help
+      backend: file:///lzcapp/pkg/content/web/index.html
+    - location: /
+      backend: http://app:8080/
+  public_path:
+    - /
+    - /help  # ⚠️ 必须同时声明，否则 injects 无法访问
 ```
 
 ## Conversion Checklist

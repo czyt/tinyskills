@@ -1406,6 +1406,8 @@ application:
 
 > 配置要点：帮助页路径（`/help`）须同时出现在 `upstreams` 和 `public_path` 中，否则无法访问。
 
+**真实项目参考**：Ask4Me（`easychen/ask4me`）使用此模式实现 404 → 帮助页自动跳转，详见 [references/real-world-examples.md](references/real-world-examples.md) 的示例 7。
+
 **场景二：自定义错误页面** — 应用后端返回 502/503 时，显示友好的错误提示而非浏览器默认白页：
 
 ```yaml
