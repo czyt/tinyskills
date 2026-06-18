@@ -754,42 +754,81 @@ docker-run:
 
 ## 语法速查
 
+### 变量定义
+
+| 语法 | 说明 | 示例 |
+|------|------|------|
+| `name := "value"` | 字符串变量 | `version := "1.0.0"` |
+| `` name := `cmd` `` | 命令求值 | `` hash := `git rev-parse HEAD` `` |
+| `name := env('VAR')` | 环境变量（必需） | `home := env('HOME')` |
+| `name := env_var_or('VAR', 'default')` | 环境变量（可选） | `db := env_var_or('DB', 'sqlite')` |
+
+### 条件表达式
+
 ```just
-# 变量
-name := "value"
-name := `command`
-name := env('VAR')
-name := env_var_or('VAR', 'default')
-
-# 条件
 x := if condition { "a" } else { "b" }
+os_name := if os() == "macos" { "darwin" } else if os() == "linux" { "linux" } else { "unknown" }
+```
 
-# 函数
-join(a, b)
-path_exists(p)
-env('VAR')
-arch()
-os()
+### 函数列表
 
-# 配方
+| 函数 | 参数 | 返回值 | 示例 |
+|------|------|--------|------|
+| `join(a, b)` | 两个路径 | 拼接后的路径 | `join("src", "main.rs")` → `src/main.rs` |
+| `path_exists(p)` | 路径字符串 | `true`/`false` | `path_exists("Cargo.toml")` |
+| `env('VAR')` | 变量名 | 变量值（必需） | `env('HOME')` |
+| `env_var_or('VAR', 'd')` | 变量名, 默认值 | 变量值或默认 | `env_var_or('PORT', '8080')` |
+| `arch()` | 无 | 架构字符串 | `arch()` → `x86_64` |
+| `os()` | 无 | 系统字符串 | `os()` → `linux` |
+| `os_family()` | 无 | 系统族 | `os_family()` → `unix` |
+| `extension(p)` | 文件路径 | 扩展名 | `extension("file.txt")` → `txt` |
+| `file_stem(p)` | 文件路径 | 文件名无扩展 | `file_stem("file.txt")` → `file` |
+| `file_name(p)` | 文件路径 | 文件名 | `file_name("path/file.txt")` → `file.txt` |
+| `directory(p)` | 文件路径 | 目录 | `directory("path/file.txt")` → `path` |
+| `replace(s, old, new)` | 字符串, 旧, 新 | 替换后 | `replace("foo-bar", "-", "_")` → `foo_bar` |
+| `trim(s)` | 字符串 | 去首尾空格 | `trim("  hello  ")` → `hello` |
+| `uppercase(s)` | 字符串 | 大写 | `uppercase("hello")` → `HELLO` |
+| `lowercase(s)` | 字符串 | 小写 | `lowercase("HELLO")` → `hello` |
+
+### 配方语法
+
+```just
+# 基本配方
 recipe:
     command
 
+# 带参数
 recipe arg:
     command {{arg}}
 
+# 带默认参数
 recipe arg="default":
     command {{arg}}
 
-# 属性
-[no-cd]
-[no-exit-message]
-[private]
-[confirm]
-[group('name')]
-[script]
-[script('bash')]
+# 可变参数（收集所有参数到列表）
+*args:
+    echo {{args}}
+
+# 依赖配方
+recipe: dep1 dep2
+    command
 ```
+
+### 属性列表
+
+| 属性 | 说明 | 示例 |
+|------|------|------|
+| `[private]` | 配方不在 --list 显示 | 等同于 `_` 前缀 |
+| `[no-cd]` | 不切换到 justfile 目录 | 在当前目录执行 |
+| `[no-exit-message]` | 失败时不显示错误信息 | 静默失败 |
+| `[confirm]` | 执行前确认 | `[confirm("Deploy to prod?")]` |
+| `[confirm]` | 执行前确认（默认提示） | 危险操作前询问 |
+| `[group('name')]` | 分组显示 | `[group('build')]` |
+| `[script]` | 脚本模式（无需缩进） | 整个配方作为脚本 |
+| `[script('bash')]` | 指定脚本解释器 | `[script('python')]` |
+| `[linux]` | 仅 Linux 可用 | 平台特定配方 |
+| `[macos]` | 仅 macOS 可用 | 平台特定配方 |
+| `[windows]` | 仅 Windows 可用 | 平台特定配方 |
 
 ---
 
