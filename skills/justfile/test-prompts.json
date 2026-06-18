@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我写一个 justfile，用于 Rust 项目，需要包含 build、test、lint、clean 等常用命令",
+    "expected": "生成完整的 Rust 项目 justfile，包含标准配方、变量定义、依赖关系"
+  },
+  {
+    "id": 2,
+    "prompt": "我的 justfile 中有一个 deploy 配方，需要支持部署到 staging 和 production 环境，怎么做参数化？",
+    "expected": "展示带参数的配方写法，环境变量处理，条件逻辑"
+  },
+  {
+    "id": 3,
+    "prompt": "just 报错 recipe failed，怎么调试？另外想让某些命令并行执行怎么写？",
+    "expected": "提供调试方法（--verbose, --dry-run）和并行执行的写法"
+  }
+]
