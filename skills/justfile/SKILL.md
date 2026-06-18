@@ -264,18 +264,7 @@ deploy-prod:
 
 ### 5. 并行任务
 
-```just
-# 并行运行测试
-test-all:
-    just test-unit &
-    just test-integration &
-    wait
-    echo "All tests complete!"
-
-# 使用 xargs 并行处理
-process-files:
-    find . -name "*.txt" | xargs -P 4 -I {} process-file {}
-```
+见下方「并行执行」章节。
 
 ---
 
@@ -446,16 +435,38 @@ api_key := env("API_KEY")
 
 ### 5. 并行执行
 
+**方式一：依赖并行（just 原生）**
+
 ```just
-# 并行运行独立任务
+# lint、test、build 作为依赖会并行执行
 ci: lint test build
     echo "CI complete!"
+```
 
-# 使用后台任务
+**方式二：后台任务 + wait**
+
+```just
+# 并行运行测试
+test-all:
+    just test-unit &
+    just test-integration &
+    just test-e2e &
+    wait
+    echo "All tests complete!"
+
+# watch 模式
 watch:
     cargo watch -x test &
     cargo watch -x build &
     wait
+```
+
+**方式三：xargs 并行处理文件**
+
+```just
+# -P 4 表示最多 4 个并行进程
+process-files:
+    find . -name "*.txt" | xargs -P 4 -I {} process-file {}
 ```
 
 ---
