@@ -52,20 +52,64 @@ lazycat-registry: registry.lazycat.cloud/czyt/heizicao/yuque-sync:8491074e73af38
 
 ### 3. 自动更新 Manifest
 
-**脚本自动执行**：
+**推荐使用通用脚本**：
 ```bash
-# 提取新镜像地址
-new_image=$(echo "$result" | grep "lazycat-registry:" | sed 's/.*lazycat-registry: //')
-
-# 更新 manifest 文件
-sed -i "s|image: .*|image: $new_image|" lzc-manifest.yml
-sed -i "s|image: .*|image: $new_image|" manifest.yml
+scripts/lzc-release-update.sh 1.2.3 --source-template 'ghcr.io/acme/app:{version}'
 ```
 
-**重要提示**：
-- 复制镜像后必须更新 manifest
-- 脚本会自动完成此步骤
-- 更新后需要重新构建才能生效
+**多镜像项目必须显式选择 service**：
+```bash
+scripts/lzc-release-update.sh 1.2.3 --service web --source-template 'ghcr.io/acme/web:{version}'
+```
+
+**为什么不能直接 sed 全局替换？**
+- `lzc-manifest.yml` 可能包含 `web`、`api`、`worker`、`db` 等多个镜像。
+- 全局替换 `image: .*` 会把不该更新的服务一起改掉。
+- 安全规则是：单镜像自动；多镜像列出候选项并要求 `--service <name>`。
+- 脚本会把选择写入 `.lazycat-release.env`；后续使用记忆值时仍会打印当前更新的 service。
+
+**脚本会自动完成**：
+- 调用 fish 中的 `lzc-copy-image <source-image>`，不存在时回退到 `lzc-cli appstore copy-image <source-image>`
+- 从 `uploaded:` 或 `lazycat-registry:` 输出中解析 `registry.lazycat.cloud/...`
+- 更新 `package.yml` 的顶层 `version`
+- 只更新选中 service 的 `image`
+- 重新构建 LPK
+
+**重要提示**：复制镜像后必须更新 manifest，更新后必须重新构建 LPK 才会生效。
+
+### 3.1 通用版本更新脚本
+
+文件：`scripts/lzc-release-update.sh`
+
+| 场景 | 命令 |
+|------|------|
+| 单镜像自动更新 | `scripts/lzc-release-update.sh 1.2.3 --source-template 'ghcr.io/acme/app:{version}'` |
+| 多镜像更新指定服务 | `scripts/lzc-release-update.sh 1.2.3 --service worker --source-image ghcr.io/acme/worker:1.2.3` |
+| 只验证改写不构建 | `COPY_IMAGE_OUTPUT='uploaded: registry.lazycat.cloud/czyt/acme/worker:abc123' scripts/lzc-release-update.sh 1.2.3 --service worker --source-image ghcr.io/acme/worker:1.2.3 --skip-build` |
+| 构建后发布 | `scripts/lzc-release-update.sh 1.2.3 --service worker --publish --changelog '更新到 1.2.3'` |
+
+```bash
+scripts/lzc-release-update.sh --help
+```
+
+`.lazycat-release.env` 示例：
+```env
+service=worker
+source_template=ghcr.io/acme/worker:{version}
+publish=0
+lang=zh
+```
+
+发布选项：
+- 默认不发布。
+- `--publish` 才发布，优先调用 fish 函数 `lzc-publish`。
+- 没有 `lzc-publish` 时回退到 `lzc-cli appstore publish -c ... --clang zh`。
+
+fish `udf.fish` 中常用函数签名：
+```fish
+lzc-copy-image <source-image>
+lzc-publish <lpk-file> <changelog-message> [lang]
+```
 
 ### 4. 完整发布流程 (4个阶段)
 
@@ -121,12 +165,12 @@ publish_app  # 提交审核
 
 **后续更新流程**：
 ```bash
-1. 更新 manifest.yml 中的版本号
+1. 更新 package.yml 中的版本号
    version: 1.0.1  # 从 1.0.0 递增
 
 2. 如果镜像有变化：
    lzc-cli appstore copy-image <新镜像>
-   更新 manifest
+   更新 lzc-manifest.yml 中对应 service 的 image
 
 3. 构建并发布
    lzc-cli project build -o app-1.0.1.lpk
@@ -135,6 +179,15 @@ publish_app  # 提交审核
    自动更新现有应用
    ↓
    提交审核（1-3天）
+```
+
+推荐等价脚本：
+```bash
+scripts/lzc-release-update.sh 1.0.1 \
+  --service web \
+  --source-template 'ghcr.io/acme/web:{version}' \
+  --publish \
+  --changelog '更新到 1.0.1'
 ```
 
 ## 📋 完整文件清单

@@ -217,7 +217,25 @@ lzc-cli appstore publish release.lpk
 
 # Update existing app
 lzc-cli appstore publish release.lpk
+
+# Publish with changelog
+lzc-cli appstore publish release.lpk -c "更新到 1.2.3" --clang zh
 ```
+
+### Common fish wrappers
+
+If fish loads `~/.config/fish/conf.d/udf.fish`, prefer these wrappers when present:
+
+```fish
+lzc-copy-image <source-image>
+lzc-build <lzc-build.yml>
+lzc-publish <lpk-file> <changelog-message> [lang]
+```
+
+`scripts/lzc-release-update.sh` detects fish functions automatically:
+- `lzc-copy-image` is used before `lzc-cli appstore copy-image`
+- `lzc-publish` is used before `lzc-cli appstore publish -c ... --clang ...`
+- publish remains opt-in through `--publish` or `publish=1`
 
 ### View My Images
 

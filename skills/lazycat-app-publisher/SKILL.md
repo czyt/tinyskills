@@ -1,6 +1,6 @@
 ---
 name: lazycat-app-publisher
-description: LazyCat v1.6.0+ 应用发布助手，支持智能 Docker Compose 转换、依赖分析、自动凭证生成、compose_override、高级路由、权限自动分析（binds路径→permissions声明）、应用间访问（.lzcx）、Skill/MCP 资源导出与导入、run_as 容器 UID/GID 配置、文件选择器自动拦截（应用商店强制）。默认 LPK v2 格式。触发词：Docker Compose 转 LazyCat、发布应用到 LazyCat、创建 LPK 包、管理 LazyCat 应用生命周期、权限声明、应用间访问、MCP 导出、Skill 导出、import_resources、resource_exports、run_as、UID 映射、容器用户配置、文件选择器、file picker、上传下载拦截、网盘集成。
+description: Use when converting Docker Compose or Docker Run apps to LazyCat LPK v2, publishing or updating LazyCat apps, copying Docker images to the LazyCat registry, selecting images in multi-service manifests, using lzc-publish, or configuring permissions, passwordless login, app interconnect, resources, run_as, and file picker integration.
 preferences:
   - id: add_root_to_public_path
     name: 添加 / 到 public_path
@@ -84,6 +84,7 @@ preferences:
 | [references/real-world-examples.md](references/real-world-examples.md) | 真实项目示例 |
 | [references/store-rule.md](references/store-rule.md) | ⭐ 应用商店审核规则 - 激励标准、禁止类型、上架要求 |
 | [references/developer-guide.md](references/developer-guide.md) | 社区开发指南 - Go SDK、裸应用、网络配置、调试技巧 |
+| [scripts/lzc-release-update.sh](scripts/lzc-release-update.sh) | 既有项目版本更新脚本 - 复制镜像、更新 version/manifest、构建、可选 `lzc-publish` |
 
 ---
 
@@ -324,6 +325,29 @@ http://app.<目标包名>.lzcx<endpoint>
 **输入**: 配置文件已生成
 **输出**: LPK 包 + 发布到应用商店
 
+#### Step 3.0: 既有项目版本更新（推荐脚本）
+
+已有 LPK 项目升级版本时，优先使用通用脚本。先按 manifest 镜像数量选模式：
+
+| 场景 | 命令 | 结果 |
+|------|------|------|
+| 单镜像 | `scripts/lzc-release-update.sh 1.2.3 --source-template 'ghcr.io/acme/app:{version}'` | 自动更新唯一 service |
+| 多镜像 | `scripts/lzc-release-update.sh 1.2.3 --service web --source-template 'ghcr.io/acme/web:{version}'` | 只更新 `web` |
+| 发布审核 | `scripts/lzc-release-update.sh 1.2.3 --service web --publish --changelog '更新到 1.2.3'` | 构建后调用 `lzc-publish` |
+
+```bash
+# 不确定源镜像时直接指定完整镜像
+scripts/lzc-release-update.sh 1.2.3 --service web --source-image ghcr.io/acme/web:1.2.3
+```
+
+多镜像规则：
+- 如果 `lzc-manifest.yml` 只有一个 `services.*.image`，脚本可以自动更新。
+- 如果有多个镜像，必须通过 `--service <name>` 指明要更新哪个服务。
+- 脚本会把选择记到 `.lazycat-release.env`；下次使用记忆值时仍会显式打印正在更新的 service。
+- 镜像复制优先调用 fish 中的 `lzc-copy-image`，不存在时回退到 `lzc-cli appstore copy-image`。
+- 发布是显式动作：只有 `--publish` 或配置 `publish=1` 时才调用 `lzc-publish <lpk> <changelog> [lang]`。
+- 如果 `copy-image` 没有返回 `registry.lazycat.cloud/...`，停止并保留原 manifest，不要猜测镜像地址。
+
 #### Step 3.1: 本地验证
 
 ```bash
@@ -404,6 +428,24 @@ Help me publish this application to LazyCat Cloud:
 3. 执行 lzc-cli appstore publish
 4. 返回发布结果
 ```
+
+### Update Existing App Version
+
+**输入格式**: 版本号 + 上游镜像（或镜像模板）
+**输出**: 更新后的 `package.yml`、`lzc-manifest.yml`、LPK 包，可选发布
+
+```bash
+# 推荐：记录源镜像模板，后续只传版本
+scripts/lzc-release-update.sh 1.2.3 --service web --source-template 'ghcr.io/acme/web:{version}'
+
+# 如果项目只有一个镜像，可省略 --service
+scripts/lzc-release-update.sh 1.2.3 --source-image ghcr.io/acme/web:1.2.3
+
+# 发布更新到应用商店审核
+scripts/lzc-release-update.sh 1.2.3 --service web --publish --changelog '更新到 1.2.3'
+```
+
+当 manifest 中有多个镜像时，先列出所有候选镜像并要求明确选择 service；不要静默批量替换，也不要默认替换第一个镜像。
 
 ### Configure Multi-Entry Points
 
@@ -877,6 +919,16 @@ locales:
 
 ### ❌ Avoid - 常见错误
 
+发布更新反例黑名单：
+
+| ❌ 不要做 | 后果 | ✅ 正确做法 |
+|----------|------|------------|
+| 对 `image: .*` 做全局 `sed` 替换 | 多镜像项目会更新错服务 | 用 `scripts/lzc-release-update.sh --service <name>` |
+| 多镜像 manifest 未确认 service 就复制/发布 | 用户无法判断到底更新了哪个容器 | 先列出 `services.*.image`，要求显式选择或读取 `.lazycat-release.env` 并打印 |
+| 构建后默认发布 | 未审核的 LPK 进入应用商店流程 | 只有用户要求或传 `--publish` 时调用 `lzc-publish` |
+| `copy-image` 解析不到 registry 地址仍继续 | manifest 指向不存在或旧镜像 | 立即停止，保留文件，提示用户贴出完整输出 |
+| 只改 manifest 不改 `package.yml` 版本 | 构建产物版本混乱，更新审核失败 | 同步更新 `package.yml` 顶层 `version` |
+
 ```yaml
 # ❌ 将静态包元数据放在 lzc-manifest.yml（LPK v2 不允许）
 # 这些字段应该移到 package.yml
@@ -1331,6 +1383,15 @@ application:
 |---------|---------|---------|-----------|
 | **应用商店 API 不可达** | GET search.lazycat.cloud 超时 | 提示用户检查网络，可跳过检查继续创建 | 进入离线模式，用户需手动确认无重名后继续 |
 | **镜像源不可达** | docker pull 超时或 502 | 推荐 `registry.lazycat.cloud` 镜像源 | 配置 compose_override 使用备用源（dockerproxy.net 等），或内嵌镜像 |
+
+### 发布更新阶段异常
+
+| 异常类型 | 触发条件 | 一线修复 | 仍失败兜底 |
+|---------|---------|---------|-----------|
+| **多镜像选择缺失** | `lzc-manifest.yml` 有多个 `services.*.image` 且未提供 `--service` | 列出 service/image 清单，要求用户指定 | 若 `.lazycat-release.env` 有 service，使用该值并显式打印 |
+| **镜像地址解析失败** | `copy-image` 输出不含 `registry.lazycat.cloud/...` | 停止更新，要求用户贴完整输出 | 用 `COPY_IMAGE_OUTPUT` 复现解析，或手动传 `--skip-copy --source-image <registry-image>` |
+| **发布参数缺失** | 用户要求发布但没有 changelog | 默认使用 `更新到 <version>` 并打印 | 用户要求自定义时重跑 `--changelog '<message>'` |
+| **LPK 文件名不匹配** | 构建输出不是 `<package>-v<version>.lpk` | 用 `--lpk <file>` 指定实际产物 | 检查 `lzc-build.yml` 的 `pkgout/pkg_id` 配置 |
 
 ### 运行时异常
 

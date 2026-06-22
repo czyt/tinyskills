@@ -43,5 +43,20 @@
     "id": 9,
     "prompt": "帮我把这个 Excalidraw 的 docker-compose 转为 LazyCat 格式，应用有文件打开和保存功能：\nservices:\n  excalidraw:\n    image: excalidraw/excalidraw:latest\n    ports:\n      - \"80:80\"\n",
     "expected": "应检测到文件操作功能，在 lzc-manifest.yml 中添加文件选择器拦截 inject（open-save-chooser），并提示需要将 lzc-file-chooser-inject.js 放入 content 目录"
+  },
+  {
+    "id": 10,
+    "prompt": "已有 LazyCat 应用要更新到 1.2.3，lzc-manifest.yml 里有 web 和 worker 两个 services.*.image。请帮我复制新镜像并更新 manifest。",
+    "expected": "应先列出 web/worker 的镜像并明确提醒用户指定要更新哪个 service；不能静默更新全部或随便更新第一个。若有 .lazycat-release.env 记住 service，可使用但必须显式说明正在使用记忆值。"
+  },
+  {
+    "id": 11,
+    "prompt": "给已有 LazyCat LPK 项目加一个通用版本更新脚本：输入版本后复制镜像、更新 package.yml version、更新 lzc-manifest.yml 镜像、重新构建。",
+    "expected": "应使用 scripts/lzc-release-update.sh；单镜像可自动选择，多镜像要求 --service；支持 --source-image 或 --source-template；复制镜像优先调用 fish 的 lzc-copy-image，失败/不存在再用 lzc-cli appstore copy-image。"
+  },
+  {
+    "id": 12,
+    "prompt": "构建完是否发布更新到懒猫微服？我 fish 里常用 lzc-publish <lpk-file> <changelog-message>。",
+    "expected": "应把发布作为显式选择（例如 --publish/--no-publish），发布时优先调用 fish 函数 lzc-publish <lpk-file> <changelog-message> [lang]；没有该函数时再回退到 lzc-cli appstore publish -c ... --clang zh。"
   }
 ]
