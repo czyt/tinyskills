@@ -434,6 +434,35 @@ Help me publish this application to LazyCat Cloud:
 **输入格式**: 版本号 + 上游镜像（或镜像模板）
 **输出**: 更新后的 `package.yml`、`lzc-manifest.yml`、LPK 包，可选发布
 
+#### 从注释自动推导（推荐）
+
+在 `lzc-manifest.yml` 的 `image:` 行上方添加注释，记录上游镜像：
+
+```yaml
+services:
+  web:
+    # ghcr.io/acme/web:v1.0.0  ← 脚本会读取这个注释
+    image: registry.lazycat.cloud/xxx/yyy:hash123
+```
+
+然后只需指定版本号：
+
+```bash
+# 自动从注释推导上游镜像
+scripts/lzc-release-update.sh 1.2.3
+
+# 多镜像时指定 service
+scripts/lzc-release-update.sh 1.2.3 --service web
+```
+
+**推导逻辑**：
+1. 优先使用 `--source-image` 或 `--source-template`
+2. 如果都没有，尝试从 `image:` 行上方的注释推导
+3. 注释格式必须是 `# org/repo:tag` 或 `# registry/org/repo:tag`
+4. 版本号会被替换为指定的新版本
+
+#### 其他方式
+
 ```bash
 # 推荐：记录源镜像模板，后续只传版本
 scripts/lzc-release-update.sh 1.2.3 --service web --source-template 'ghcr.io/acme/web:{version}'

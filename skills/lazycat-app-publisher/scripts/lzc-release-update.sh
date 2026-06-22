@@ -110,6 +110,42 @@ list_manifest_images() {
   ' "$MANIFEST_FILE"
 }
 
+list_manifest_comments() {
+  # Extract upstream image from comments above image: lines
+  # Format: # org/repo:tag or # registry/org/repo:tag
+  awk '
+    /^[[:space:]]*services:[[:space:]]*$/ {
+      in_services = 1
+      next
+    }
+    in_services && /^[^[:space:]][^:]*:[[:space:]]*$/ {
+      in_services = 0
+      service = ""
+      comment = ""
+    }
+    in_services && /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {
+      service = $1
+      sub(/:$/, "", service)
+      comment = ""
+      next
+    }
+    in_services && service != "" && /^    # / {
+      # Extract image from comment (remove leading spaces and #)
+      comment = $0
+      sub(/^[[:space:]]*#[[:space:]]*/, "", comment)
+      # Remove trailing whitespace
+      gsub(/[[:space:]]*$/, "", comment)
+      next
+    }
+    in_services && service != "" && /^    image:[[:space:]]*/ {
+      if (comment != "" && comment ~ /^[a-zA-Z0-9].*:[a-zA-Z0-9]/) {
+        print service "\t" comment
+      }
+      comment = ""
+    }
+  ' "$MANIFEST_FILE"
+}
+
 print_manifest_images() {
   list_manifest_images | awk -F '\t' '{ printf "  - service=%s image=%s\n", $1, $2 }' >&2
 }
@@ -117,6 +153,11 @@ print_manifest_images() {
 find_service_image() {
   local target=$1
   list_manifest_images | awk -F '\t' -v target="$target" '$1 == target { print $2; found = 1 } END { exit found ? 0 : 1 }'
+}
+
+find_service_comment() {
+  local target=$1
+  list_manifest_comments | awk -F '\t' -v target="$target" '$1 == target { print $2; found = 1 } END { exit found ? 0 : 1 }'
 }
 
 select_service() {
@@ -176,6 +217,21 @@ resolve_source_image() {
   fi
   if [[ -n "${SOURCE_TEMPLATE:-}" ]]; then
     SOURCE_IMAGE=$(render_source_template "$SOURCE_TEMPLATE")
+    return 0
+  fi
+
+  # Try to derive from comment first
+  local comment_image
+  comment_image=$(find_service_comment "$SERVICE")
+  if [[ -n "$comment_image" ]]; then
+    note "Found upstream image in comment: $comment_image"
+    # Replace version in comment
+    if [[ "$comment_image" == *:* ]]; then
+      SOURCE_IMAGE="${comment_image%:*}:$VERSION"
+    else
+      SOURCE_IMAGE="$comment_image:$VERSION"
+    fi
+    note "Derived source image from comment: $SOURCE_IMAGE"
     return 0
   fi
 
