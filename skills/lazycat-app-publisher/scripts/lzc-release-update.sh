@@ -164,13 +164,15 @@ select_service() {
   mapfile -t IMAGE_ENTRIES < <(list_manifest_images)
   [[ ${#IMAGE_ENTRIES[@]} -gt 0 ]] || die "$MANIFEST_FILE does not contain services.*.image entries"
 
-  # Track if SERVICE came from config file
-  local from_config="no"
-  if [[ -n "${SERVICE:-}" && -f "$CONFIG_FILE" ]]; then
-    if grep -q "^service=$SERVICE$" "$CONFIG_FILE" 2>/dev/null; then
-      from_config="yes"
+  # Track if SERVICE was explicitly provided via command line
+  local service_explicit="no"
+  # Check if --service was in the original arguments
+  for arg in "${ARGS[@]:-}"; do
+    if [[ "$arg" == "--service" ]]; then
+      service_explicit="yes"
+      break
     fi
-  fi
+  done
 
   if [[ -n "${SERVICE:-}" ]]; then
     CURRENT_IMAGE=$(find_service_image "$SERVICE") || {
@@ -179,10 +181,10 @@ select_service() {
       die "service '$SERVICE' does not have an image in $MANIFEST_FILE"
     }
     if [[ ${#IMAGE_ENTRIES[@]} -gt 1 ]]; then
-      if [[ "$from_config" == "yes" ]]; then
-        note "Using remembered service '$SERVICE' from $CONFIG_FILE."
-      else
+      if [[ "$service_explicit" == "yes" ]]; then
         note "Updating selected service '$SERVICE' in a multi-image manifest."
+      else
+        note "Using remembered service '$SERVICE' from $CONFIG_FILE."
       fi
     fi
     return 0
