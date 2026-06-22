@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "prompt": "我要写一个 LazyCat agent 应用，启动后发现微服里所有可用的 Skills 和 MCP providers，应该怎么配置 package.yml，运行时扫哪些目录，mcp.yml 的 endpoint 怎么变成可调用 URL？",
+    "expected": "应说明 package.yml 使用 import_resources 引入 skills 和 mcp-providers；运行时扫描 /lzcapp/run/resources/skills 与 /lzcapp/run/resources/mcp-providers；解析 mcp.yml endpoint；用 http://app.<app-id>.lzcx<endpoint> 拼接 MCP URL；访问其他应用时需要 lzcapp.user_delegate 和 X-HC-USER-TICKET。"
+  },
+  {
+    "id": 2,
+    "prompt": "我在做一个 LazyCat MCP 网关，想把多个上游 provider 的 tools 动态合并到自己的 tools/list 里，并且调用时转发到对应上游，应该怎么设计？",
+    "expected": "应给出 Initialize + ListTools 的刷新流程；工具名应改成 <provider_slug>__<tool_name> 避免冲突；调用聚合工具时还原上游原工具名并转发 arguments；单个 provider 失败不应让整个 MCP 服务失效。"
+  },
+  {
+    "id": 3,
+    "prompt": "我的 LazyCat 应用要对外提供 MCP，endpoint 是 /mcp，希望其他 agent 能自动发现。需要哪些资源文件、lzc-build.yml 配置和最小 Go handler 模式？",
+    "expected": "应说明 resources/mcp-providers/<provider-id>/mcp.yml 写 endpoint: /mcp；lzc-build.yml resource_exports 导出 mcp-providers；推荐 POST /mcp Streamable HTTP；provider 自身通常不需要 lzcapp.user_delegate，调用方才需要。"
+  },
+  {
+    "id": 4,
+    "prompt": "Smarticky 这种应用既要支持 LazyCat 内部应用调用 MCP，也要支持外部 MCP 客户端用 token 调用，鉴权应该怎么做，哪些事情不能做？",
+    "expected": "应说明 LazyCat header 信任必须由环境开关控制，校验 X-HC-User-ID 和 X-HC-SOURCE；外部用 Authorization: Bearer 用户级 token；token 只保存 hash 且明文只返回一次；每个 tool 都要做用户隔离，不记录原始 token 或 ticket。"
+  }
+]
