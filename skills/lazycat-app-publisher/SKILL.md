@@ -474,24 +474,7 @@ scripts/lzc-release-update.sh 1.2.3 --source-image ghcr.io/acme/web:1.2.3
 scripts/lzc-release-update.sh 1.2.3 --service web --publish --changelog '更新到 1.2.3'
 ```
 
-**⚠️ 多镜像处理流程**：
-
-当 manifest 中有多个镜像时：
-1. **先解析 manifest**：读取 `lzc-manifest.yml`，提取所有 `services.*.image` 条目
-2. **列出候选镜像**：向用户展示 service 名称和对应镜像
-3. **要求用户选择**：明确询问要更新哪个 service
-4. **调用脚本**：使用 `--service <name>` 参数
-
-```bash
-# 示例：列出镜像后让用户选择
-echo "检测到多个镜像服务："
-grep -E '^\s+\w+:$|image:' lzc-manifest.yml
-
-# 用户选择后调用
-scripts/lzc-release-update.sh 1.2.3 --service web
-```
-
-不要静默批量替换，也不要默认替换第一个镜像。
+当 manifest 中有多个镜像时，先列出所有候选镜像并要求明确选择 service；不要静默批量替换，也不要默认替换第一个镜像。
 
 ### Configure Multi-Entry Points
 
