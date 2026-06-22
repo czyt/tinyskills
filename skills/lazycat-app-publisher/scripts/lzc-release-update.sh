@@ -387,10 +387,20 @@ fi
 shift
 [[ "$VERSION" != *[[:space:]]* ]] || die "version must not contain whitespace"
 
-MANIFEST_FILE=${MANIFEST_FILE:-lzc-manifest.yml}
 PACKAGE_FILE=${PACKAGE_FILE:-package.yml}
 BUILD_FILE=${BUILD_FILE:-lzc-build.yml}
 CONFIG_FILE=${CONFIG_FILE:-.lazycat-release.env}
+
+# Auto-detect manifest file: prefer lzc-manifest.yml, fallback to manifest.yml
+if [[ -z "${MANIFEST_FILE:-}" ]]; then
+  if [[ -f "lzc-manifest.yml" ]]; then
+    MANIFEST_FILE="lzc-manifest.yml"
+  elif [[ -f "manifest.yml" ]]; then
+    MANIFEST_FILE="manifest.yml"
+  else
+    MANIFEST_FILE="lzc-manifest.yml"
+  fi
+fi
 SERVICE=${SERVICE:-}
 SOURCE_IMAGE=${SOURCE_IMAGE:-}
 SOURCE_TEMPLATE=${SOURCE_TEMPLATE:-}
