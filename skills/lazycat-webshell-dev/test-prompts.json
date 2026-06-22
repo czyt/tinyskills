@@ -30,6 +30,26 @@
     "expected": "输出稳定 selector/account/tab_id/pane_id、GET state、POST action、GET activity、ATTACH stream、history-replay-start/complete、selector+pane identity 校验、pending input 队列、revision 输入锁、online/focus/visibility 重连和账号授权。"
   },
   {
+    "id": "multi-device-output-consistency",
+    "prompt": "同一个 LightOS WebShell pane 被两个浏览器标签页和一台手机同时打开，如何保证它们看到一致的历史输出和实时输出？请不要只说 WebSocket 广播，要说明状态、回放、输入和 resize 的边界。",
+    "expected": "说明一个 pane 只有一个 PTY/raw byte source；输出先进入 bounded per-pane history 再广播给所有 attach client；新 client 先收到 history-replay-start(selector+pane_id)、历史字节、history-replay-complete，再接收 live bytes；客户端校验 replay identity、完成前排队用户输入并抑制 secondary generated terminal responses；后端有 queue/backpressure、input_lock、process-exit 控制事件；resize 是共享 PTY 决策，主动设备可能影响被动设备换行，必要时定义 leader/follower 策略。"
+  },
+  {
+    "id": "lightos-command-boundary",
+    "prompt": "我在用 Rust/Node/Python 写 WebShell provider，不想照搬 Go。请列出必须通过 LightOS 调用的命令/API、每个命令为什么存在，以及哪些逻辑不能放到前端猜。",
+    "expected": "列出 /lzcinit/lightosctl ps、system admin-info --json、exec、exec -i、exec -ti、forward，以及 /unsafe_api/webshell/* 和 /unsafe_api/publish/* 的角色；解释 selector 发现/授权、admin base_url/return/Catlink/Publish、实例内 shell/file/agent/process scan、PTY/非交互 IO、已有 web terminal 代理；强调前端不猜 admin 域名、不发明 selector、不绕过账号校验。"
+  },
+  {
+    "id": "source-is-not-go-template",
+    "prompt": "参考 lazycat-microserver-webshell 源码后，帮我给一个非 Go WebShell provider 设计会话保持方案。请说明哪些是源码证明的原则，哪些只是 Go 实现细节。",
+    "expected": "把源码抽象成 instance-local session authority/agent、state/action/activity/attach 协议、bounded raw history、multi-client broadcast、history replay identity、input lock、lightosctl command boundary、frontend VT renderer 和 UX 事件分类；明确 Go binary、gorilla websocket、creack/pty、具体路径名只是实现示例，可替换为其他语言等价能力。"
+  },
+  {
+    "id": "end-to-end-source-abstraction",
+    "prompt": "请基于 lazycat-microserver-webshell 源码，为一个 Rust/Node/Python 都能实现的 LightOS WebShell provider 给出端到端设计。必须同时覆盖多端会话一致性、移动端/桌面交互抽象、LightOS 命令边界，以及哪些源码细节不能照搬。",
+    "expected": "输出 LightOS discovery/auth、provider UX/routing/stream brokerage、target-instance session authority 的三方边界；说明 selector/account/tab_id/pane_id、state/action/activity/attach、bounded raw history、broadcast、history replay identity、input queue/input_lock、generated response suppression、shared resize；把交互分为 terminal bytes、stream control、workspace actions、frontend-only actions、platform navigation/API；列出 lightosctl ps/admin-info/exec/exec -i/exec -ti/forward 和 /unsafe_api/webshell/*、/unsafe_api/publish/* 的用途；明确 Go 代码、具体库和二进制形态只是参考实现。"
+  },
+  {
     "id": "mobile-terminal-ux",
     "prompt": "这个 LightOS WebShell 在手机浏览器上软键盘挡住终端、中文输入重复、没有 Tab/方向键，也不适合触摸选择，skill 应该指导我补哪些移动端能力？",
     "expected": "覆盖 viewport-fit/safe-area/visualViewport/dvh、移动端快捷键、IME composition 预览和提交、touch selection handles、action sheet、browser back overview guard、orientation/keyboard 后重新 resize、无 hover 依赖和离线重连验证。"

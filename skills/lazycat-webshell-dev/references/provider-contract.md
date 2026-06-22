@@ -1,6 +1,6 @@
 # LazyCat WebShell Provider Contract
 
-This reference distills the `webshell-provider-examples` repo into reusable implementation rules for LazyCat/LightOS WebShell providers.
+This reference distills `webshell-provider-examples` plus the `lazycat-microserver-webshell` source into reusable implementation rules for LazyCat/LightOS WebShell providers.
 
 ## Stable Contract
 
@@ -13,6 +13,8 @@ https://<provider-domain><root_path>?name=<name>@<owner_deploy_id>
 ```
 
 The provider must not depend on lightos-admin source code, private routes, or internal frontend state. The public contract is the provider app URL plus the `name` query parameter; everything else should be resolved through documented platform commands or public endpoints.
+
+The `lazycat-microserver-webshell` source proves a useful target model: the provider backend launches and brokers streams, while a target-instance agent owns workspace/session state. That agent happens to be compiled from Go in the reference project, but the model is runtime-neutral: any language can implement the same state/action/activity/attach protocol and run it inside the target instance.
 
 ## Required Files
 
@@ -135,6 +137,23 @@ Authorization requirements:
 - prefer filtering by current provider deploy ID, then fall back to `admin-info.deploy_id` if the environment deploy ID is missing or stale;
 - return `401` for missing account context, `403` for cross-account selectors, and `400` for malformed selectors.
 
+## LightOS Command Boundary
+
+The provider should have a narrow platform-command boundary. Keep these calls server-side so the frontend never guesses LightOS internals.
+
+| Operation | Command/API | Why it exists | Guardrail |
+| --- | --- | --- | --- |
+| Discover instances | `/lzcinit/lightosctl ps` | Produces `name`, `owner_deploy_id`, `status`, optional `username`; source of selector truth | Parse JSON; never invent selectors client-side |
+| Resolve admin | `/lzcinit/lightosctl system admin-info --json` | Provides `base_url` and deploy ID for return navigation, Catlink, Publish proxy, and owner fallback | Validate `http/https` scheme and host before use |
+| Minimal PTY | `/lzcinit/lightosctl exec -ti <selector> /bin/sh -lc <bootstrap>` | Allocates an interactive shell in the target instance | Validate selector and account before spawning |
+| Noninteractive IO | `/lzcinit/lightosctl exec -i <selector> ...` | Streams tar/file/agent attach stdin/stdout without terminal allocation | Cap payloads; close stdin on detach |
+| Agent request | `/lzcinit/lightosctl exec <selector> <agent-bin> agent request ...` | Sends state/action/activity RPC to the instance-local session authority | Include selector + account in every request |
+| Process/activity scan | `/lzcinit/lightosctl exec <selector> /bin/sh -lc <proc-scan>` | Reads cwd/command/busy metadata for panes | Treat scan failure as metadata degradation, not terminal death |
+| Existing web terminal | `/lzcinit/lightosctl forward -L local:remote <selector>` | Proxies an in-instance web UI such as zellij Web or a custom service | Tie lifecycle to selected instance and kill stale forwards |
+| Admin platform API | `/unsafe_api/webshell/*`, `/unsafe_api/publish/*` | Catlink status/attach and Publish service management | Browser calls use `credentials: "include"`; backend proxies only allowed routes |
+
+Source `/run/catlink/shell-env.sh` in user shells when present. It injects LightOS/Catlink environment expected by platform tooling inside the instance. For non-root users, resolve `uid/gid/home/shell`, set `HOME`, `USER`, `LOGNAME`, `SHELL`, `XDG_CONFIG_HOME`, optional `XDG_RUNTIME_DIR`, and prefer `setpriv` over `su` for the final login shell.
+
 ## Same-Page lightos-admin Return
 
 The provider should let users return to lightos-admin without opening a new tab or guessing the admin domain.
@@ -209,6 +228,20 @@ Control path:
 
 Desktop shortcuts should map to named frontend actions first, for example `new_tab`, `vertical_split`, or `copy_terminal`. Only shortcuts that represent terminal input should become bytes. This prevents Ctrl+Shift+T from being accidentally sent to the shell when the user meant "new tab".
 
+## UX Interaction Abstraction
+
+Classify every interaction before wiring it:
+
+| Interaction class | Examples | Owner | Transport |
+| --- | --- | --- | --- |
+| Terminal byte input | keyboard text, paste, IME commit, mobile Tab/Esc/arrows/Ctrl bytes | active pane | stream `input` frame |
+| Stream control | resize, input lock, detach, ping/pong | active pane stream | stream control frame |
+| Workspace action | new tab, split pane, close pane, rename, activate, move | session/workspace authority | `POST workspace action` |
+| Frontend-only action | copy, search current buffer, theme picker, local menu, tab overview | browser UI | no backend call unless state changes |
+| Platform navigation/API | return home, Catlink status, Publish service | LightOS/admin boundary | provider API or public admin endpoint |
+
+This split keeps desktop shortcuts, mobile shortcut buttons, context menus, and terminal renderer events coherent. If two UI surfaces perform the same conceptual action, they must call the same action handler or emit the same protocol message.
+
 ## VT Parser and Renderer Boundary
 
 For an interactive browser WebShell, VT parsing and rendering should normally live in the frontend. Use a browser terminal renderer such as xterm.js, Ghostty Web/WASM, hterm, or another proven VT renderer. The backend should stay a PTY/session broker:
@@ -237,9 +270,9 @@ If a backend VT is required, make it an explicit architecture decision, choose o
 
 Provider process restarts should not destroy user work. Prefer keeping session state inside the target LightOS instance:
 
-- tmux or zellij sessions;
-- an instance-local session manager;
-- instance-local shell history and working directory state.
+- an instance-local session manager or agent;
+- tmux/zellij only when the chosen product architecture explicitly wraps those tools;
+- instance-local shell history and working directory state for simpler providers.
 
 The provider LPK backend should mainly serve UI, discover sessions, attach to existing sessions, and proxy traffic.
 
@@ -277,6 +310,37 @@ Server/runtime revision rules:
 
 Multi-device note: one PTY normally has one active cols/rows size. If multiple clients attach to the same pane, resize to the actively interacting device and document that passive viewers may see terminal wrapping change.
 
+### Source-Proven Instance Agent Pattern
+
+The `lazycat-microserver-webshell` reference uses this algorithm; port the algorithm, not the Go implementation:
+
+1. The provider resolves selector/account and ensures an instance-local agent is installed.
+2. The agent listens on an instance-local private socket scoped by selector/account.
+3. The provider sends JSON requests for `state`, `action`, and `activity`.
+4. The provider starts an `attach` bridge with `lightosctl exec -i <selector> <agent-bin> agent attach ...`.
+5. The agent attaches the bridge to a stable `pane_id` and streams framed bytes/control messages.
+6. The browser rebuilds workspace state first, then opens streams for visible panes.
+
+This puts durable tab/pane/process state near the PTYs. The provider can restart without killing instance-local sessions if the agent protocol remains compatible.
+
+### Multi-Client Output Consistency
+
+When the same pane is open from multiple tabs/devices, consistency comes from one output source and replay identity:
+
+| Step | Required behavior |
+| --- | --- |
+| PTY output | Read raw PTY bytes once. Filter only provider-private control responses or generated echo noise; do not reinterpret terminal output in the backend. |
+| History | Append output chunks to bounded per-pane raw history before broadcasting. Trim by bytes/scrollback policy, not by client count. |
+| Broadcast | Send the same output chunks to every attached client for that pane. Slow clients need queue limits and disconnect/backpressure policy. |
+| Attach | New clients receive `history-replay-start` with selector + pane ID, then history bytes, then `history-replay-complete`. |
+| Client validation | Client rejects replay if selector/pane identity does not match the requested stream. |
+| Input timing | Client queues input until replay completes; backend ignores input while input lock is active. |
+| Generated responses | Only the intended attach should answer terminal-generated queries during replay; secondary clients suppress generated cursor/device-status responses. |
+| Resize | The last active client can resize the PTY; passive clients may see wrapping change. For collaborative editing, define a leader/follower resize policy. |
+| Exit | Process-exit is a control event; notify all clients, close the pane, then refresh workspace state. |
+
+Do not create a separate PTY per browser tab if the user expects shared panes. That gives each device a different process and makes output consistency impossible.
+
 ## Mobile Terminal UX
 
 A mobile WebShell must be designed as a touch terminal, not a shrunken desktop terminal.
@@ -292,6 +356,8 @@ Required behavior:
 - handle mobile selection with long press, draggable handles, and a touch-friendly action sheet;
 - intercept mobile browser Back only for in-app overlays such as tab overview; never trap users on the page permanently;
 - remeasure and send terminal cols/rows after keyboard open/close, orientation change, visibility changes, and focus return.
+- show connection state and retryable errors without stealing focus from the terminal;
+- use health ping/resume probes and reconnect visible panes on `online`, focus, visibility, and page-show.
 
 Recommended options:
 
@@ -402,6 +468,9 @@ DELETE <admin-base>/unsafe_api/publish/services/<id>
 | Return to admin opens extra tabs | Resolve `admin-info.base_url`, persist provider state, then use same-page `location.assign(<base>?view=home)`. |
 | Refresh loses tabs/panes | Workspace state lacks stable tab/pane IDs or restore happens after stream attach. |
 | Reconnect duplicates or scrambles output | History replay lacks start/complete markers or selector/pane identity validation. |
+| Two browser tabs show different output for the same pane | Provider created separate PTYs or per-client histories; use one pane history plus broadcast and replay. |
+| Input lands before replay finishes | Client must queue input until `history-replay-complete`; backend should honor `input_lock`. |
+| Passive viewer sees line wrapping change | Shared PTY was resized by another device; document this or implement leader/follower resize policy. |
 | Resize is broken | Frontend sends terminal cols/rows on connect and resize; backend validates positive integers before `pty.Setsize`. |
 | Mobile keyboard covers terminal | Use visual viewport/safe-area sizing and remeasure terminal after keyboard transitions. |
 | IME duplicates characters | Keep composition state separate and send text only after committed input. |
