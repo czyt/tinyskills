@@ -391,15 +391,16 @@ PACKAGE_FILE=${PACKAGE_FILE:-package.yml}
 BUILD_FILE=${BUILD_FILE:-lzc-build.yml}
 CONFIG_FILE=${CONFIG_FILE:-.lazycat-release.env}
 
-# Auto-detect manifest file: prefer lzc-manifest.yml, fallback to manifest.yml
+# Auto-detect manifest file from lzc-build.yml
 if [[ -z "${MANIFEST_FILE:-}" ]]; then
-  if [[ -f "lzc-manifest.yml" ]]; then
-    MANIFEST_FILE="lzc-manifest.yml"
-  elif [[ -f "manifest.yml" ]]; then
-    MANIFEST_FILE="manifest.yml"
-  else
-    MANIFEST_FILE="lzc-manifest.yml"
+  if [[ -f "$BUILD_FILE" ]]; then
+    # Extract manifest path from lzc-build.yml (format: manifest: ./xxx.yml)
+    MANIFEST_FILE=$(awk '/^manifest:/ { gsub(/^[[:space:]]*manifest:[[:space:]]*/, ""); gsub(/[[:space:]]*$/, ""); print }' "$BUILD_FILE")
+    # Remove leading ./ if present
+    MANIFEST_FILE="${MANIFEST_FILE#./}"
   fi
+  # Fallback to default if not found
+  MANIFEST_FILE=${MANIFEST_FILE:-lzc-manifest.yml}
 fi
 SERVICE=${SERVICE:-}
 SOURCE_IMAGE=${SOURCE_IMAGE:-}
