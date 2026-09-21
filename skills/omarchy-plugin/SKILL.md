@@ -258,20 +258,20 @@ custom-clock/
 └── tests/           # optional; node --test against the pure helpers
 ```
 
-🛑 STOP — never open a marketplace issue before `omarchy plugin add <url>
---enable --yes` succeeds against the exact pushed commit, on a machine with no
-maintainer-only context. The issue is bound to a commit; a repository that only
-installs for its author cannot be listed.
-
-The publishing gate is a public GitHub repository, valid root `manifest.json`,
-README with install **and** removal instructions, a license file, and a
-validated current commit:
+The publishing gate is a public GitHub repository with the plugin at its root —
+`manifest.json`, README with install **and** removal instructions, a license
+file, documented external dependencies, a globally unique plugin ID outside
+`omarchy.*` — and a commit that installs without maintainer-only context:
 
 ```bash
 omarchy plugin add https://github.com/yourname/custom-clock.git --enable --yes
 omarchy plugin update io.github.yourname.clock --yes
 omarchy plugin remove io.github.yourname.clock --yes
 ```
+
+🛑 STOP — do not open a marketplace issue until that install/update/remove
+round-trip succeeds against the exact pushed commit. The issue is bound to that
+commit, and a repository that only installs for its author cannot be listed.
 
 ### Submit to the marketplace
 
@@ -281,11 +281,9 @@ The marketplace is
 Quattro compatibility, runs an Automated Security Baseline against the exact
 commit, and publishes only after a maintainer applies `approved-and-verified`.
 
-Repository requirements: public GitHub repo, plugin at the **root**, root
-`manifest.json`, root README with install and removal instructions, root
-license file, documented external dependencies, globally unique plugin ID
-outside `omarchy.*` (IDs are permanent — search the marketplace first), and
-optionally one root `preview.png` (≤50 MB / 40 MP; the build optimizes it).
+Two things beyond the gate above: plugin IDs are permanent and must be globally
+unique (search the marketplace before choosing one), and one optional root
+`preview.png` (≤50 MB / 40 MP — the build optimizes it) may ship with the repo.
 
 🔴 CHECKPOINT — the issue *is* the listing request. Show the finished title and
 body to the plugin owner, get explicit approval, and only then create it. Fix
@@ -352,9 +350,9 @@ and give the exact 40-character SHA; the listed snapshot stays unchanged until
 the new commit passes validation, the baseline and maintainer review.
 
 When preparing a submission for someone else: read their manifest, README and
-license first, pick the category and tags from the allowed values, keep every
-heading and checklist line intact, show the finished title and body to the
-owner, and only create the issue after the owner explicitly approves it.
+license first, pick the category and tags from the allowed values, and keep
+every heading and checklist line intact. The owner-approval checkpoint above
+applies to agent-prepared submissions too.
 
 ## Red Flags — STOP
 
