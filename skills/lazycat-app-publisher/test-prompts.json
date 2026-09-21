@@ -143,5 +143,15 @@
     "id": 29,
     "prompt": "request inject 的 when: [\"/api/*\"] 能匹配 /api 吗？想同时匹配目录根和子路径；当前客户端 ID 怎么取，和开发机 ID 一样吗？",
     "expected": "严格前缀匹配不含/api，应 when: [\"/api\", \"/api/*\"]；ctx.client.id 来自Ingress且可为空，与ctx.dev.id和safe_uid不同；request/response同步。"
+  },
+  {
+    "id": 30,
+    "prompt": "我做了个 RSS 阅读器应用，已经构建好 LPK 了。帮我发布上架。",
+    "expected": "识别 RSS 属非激励类型 -> 默认发布到私有/社区商店（喵喵商店：默认 lazycat-contrib 组织，可自建服务端），用 ca-x/lazycat-github-action 的 stores.private 且默认推荐镜像模式；不提交官方商店（不执行 lzc-cli appstore publish）；向用户确认发布目标"
+  },
+  {
+    "id": 31,
+    "prompt": "我这个原创笔记应用要发布到懒猫官方应用商店，帮我走流程。",
+    "expected": "指出笔记类不参与激励（非激励类型）-> 默认目标应为社区商店而非官方商店；用户明确要求官方时说明：需确认、官方审核 1-3 个工作日、强制要求免密登录与文件选择器拦截；不擅自直接提交官方"
   }
 ]
