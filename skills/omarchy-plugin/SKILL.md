@@ -130,7 +130,6 @@ Both commands must exit successfully. If `OMARCHY_PATH` is unset, locate the ins
 | Loads cleanly but renders nothing, log empty | A helper used `Array.isArray()` on a list-like QML value. See Platform pitfalls. |
 | `Binding loop detected for property X` | The binding reads a plugin-API object (`bar.layoutConfig`, `bar.clickTargets`) that the bar replaces on every sync. Cache a scalar instead. |
 | `Invalid property assignment: "implicitHeight" is a read-only property` | `Text` computes its implicit size and has no setter; use `height:`. |
-| A fix does not take effect (same line/column as before) | The QML disk cache kept the failed compile: `rm -rf ~/.cache/quickshell/qmlcache` then `omarchy restart shell`. |
 
 🔴 CHECKPOINT — do not enable a plugin you have not read. Plugins run
 unsandboxed inside the shell with the user's permissions; `validate` only
@@ -139,6 +138,69 @@ proves the manifest is well-formed.
 ### 5. Platform pitfalls (third-party plugins)
 
 Each of these is a real failure with a reproduction, not a style preference.
+
+**Shell-process safety: a plugin shares the shell's one process.**
+
+Every widget runs inside the single long-lived `omarchy-shell`, so anything
+unbounded it consumes — a file, an array, a line — can stall the whole shell and
+take every other widget with it. `omarchy plugin validate` exiting 0 says nothing
+about this: the marketplace's automated baseline has passed with zero findings
+while a human reviewer returned real defects.
+
+- **Bound input producer-side.** `ColorQuantizer` and `FileView` have no size
+  cap, no `stat` and no symlink control, and Quickshell exposes no filesystem
+  primitive that could add one — so refuse oversized or non-regular files
+  *before* the path reaches QML, and cap the read itself (`read(N + 1)`,
+  `readline(N)`) rather than reading everything and then rejecting it.
+  "Refused after reading it all" is not a bound.
+- **Answer from a descriptor you hold, not from a path you will re-resolve.**
+  `os.path.exists()` follows symlinks; `os.lstat` describes a path, not the file
+  anything opens. Open once with `O_NOFOLLOW | O_NONBLOCK`, then ask every
+  question — regular file, size, header — of that descriptor.
+- **Never write `dest + ".tmp"`.** A predictable temp name opened `"wb"` follows
+  a planted symlink. Use `tempfile.mkstemp` in the destination directory, then
+  `os.replace`.
+- **Never put an API key in `shell.json`** (world-readable, ends up in bug
+  reports) and never inline one in QML. The helper file plus `0600` is the
+  pattern the marketplace expects.
+
+**QML traps that cost real debugging time**
+
+- **Do not name a root property `bar`.** `qs.Ui`'s `Panel`/`BarWidget` inject
+  their own `bar`; declaring another is a duplicate-property error and the file
+  will not compile at all.
+- **`qs.Ui.TextField` and `QtQuick.Controls.TextField` share a name** — which
+  one wins is decided by import order. Import `qs.Ui` for its `TextField`.
+- **Overlapping siblings are hit-tested in reverse declaration order** (the last
+  one declared wins). A control inside a row that already has a full-bleed
+  `MouseArea` must be declared *after* it.
+- **A `MouseArea` with negative margins is hit-tested outside its parent** as
+  long as nothing on the path sets `clip` — that is how a thin seek bar gets a
+  usable click band.
+- **Align a column to a fixed-size neighbour by anchoring, not by tuning a
+  spacer**; any font-size change moves a tuned number again.
+- **Anchoring `bottom` inside a panel while `contentHeight` binds back to
+  `implicitHeight` is a binding loop.** Anchor `left`/`right`/`top` only.
+- **`pathFromUrl` must decode percent-encoding.** `Qt.resolvedUrl`
+  percent-encodes, so a home directory containing a space leaves `%20` in the
+  path, the spawn fails — and because a failed spawn emits no `exited()` — a
+  relay loop retries forever with nothing logged.
+
+**Verified `qs.Ui` idiom** — measured against the live shell, not the Quickshell
+docs, which describe a different component set:
+
+| Need | Use |
+|---|---|
+| Popup window | `KeyboardPanel` from `qs.Ui`, not `PopupWindow` |
+| Keyboard focus | `KeyboardPanel.focusTarget: <PanelKeyCatcher>` |
+| Key dispatch | `PanelKeyCatcher` (`moveRequested`, `activateRequested`, `returnRequested`, `closeRequested`, `textKey`) |
+| Suppress keys while typing | `PanelKeyCatcher.blocked: <editor active>` — gate on state, never on `activeFocus` |
+| Text input | `qs.Ui`'s `TextField` |
+| Spacing / sizes | `Style.space(N)`, `Style.font.<token>` — never hardcode pixels |
+| Font tokens | `caption`, `bodySmall`, `body`, `subtitle`, `title`, `heading` (there is no `Style.font.small`) |
+| Colours | `Color.foreground`, `Color.muted`, `Color.background`, `Color.accent` — no `Color.surfaceVariant`/`Color.red`/`Color.selection`; blend with `Util.alpha()` |
+| Panel sizing | `panel.fittedContentWidth(...)` / `fittedContentHeight(...)` |
+| Spawning a process | one `Process` per invocation |
 
 **A stale QML compile cache fakes type errors. Clear it before believing any.**
 
@@ -208,15 +270,6 @@ function syncLayoutOwnership() {
 
 **`Text.implicitHeight` is read-only.** `Item` has writable implicit sizes;
 `Text` computes them. Use `height:`.
-
-**A fixed file can keep failing.** The QML disk cache keeps a failed compile, so
-the same error survives copying a corrected file into the plugin folder. Clear
-it before debugging anything that "should be fixed already":
-
-```bash
-rm -rf ~/.cache/quickshell/qmlcache
-omarchy restart shell
-```
 
 **Same-owner panels and menus do not close each other.** `requestPopout(owner)`
 returns early when `activePopout === owner`, so a panel and a popup menu sharing
@@ -393,6 +446,80 @@ A daemon is not a substitute for the plugin contract: the plugin still ships
 cannot hold a Roon socket or survive a shell restart. Say so in the README, and
 keep the daemon optional — the widget must render a useful "not set up /
 disconnected" state without it.
+
+**4. `Process` + a long-running daemon — when the plugin needs push updates or
+holds a connection.** `ssandys.tonearm` is the reference for this shape. It
+ships three layers: a Python daemon (`tonearmd`) that talks to the outside
+service, a thin CLI (`tonearmctl`) as the only interface to it, and QML that
+renders whatever the CLI prints. The daemon runs as a **systemd user service
+started straight out of the plugin directory** — no copying into system paths:
+
+```ini
+# systemd/tonearmd.service, installed to ~/.config/systemd/user/ by setup.sh
+[Unit]
+Description=tonearm — Roon bridge for the Omarchy shell bar
+After=graphical-session.target
+StartLimitIntervalSec=0      # or a restart burst leaves the unit permanently failed
+
+[Service]
+Type=simple
+ExecStart=%h/.config/omarchy/plugins/ssandys.tonearm/scripts/tonearmd
+```
+
+`Service.qml` then subscribes with one long-lived `Process`:
+
+```qml
+Process {
+  id: relay
+  command: [root.ctlPath, "subscribe"]   // prints one JSON state line per change
+  stdout: SplitParser {
+    onRead: function (line) {
+      if (!line) return
+      try { root.state = JSON.parse(line); root._attempt = 0 }
+      catch (e) { /* a partial line is not worth tearing the connection down for */ }
+    }
+  }
+  // A failed spawn never emits exited() — the process goes straight to
+  // running=false without ever passing through true. onRunningChanged is the
+  // only signal that covers both a failed spawn and a normal exit.
+  onRunningChanged: {
+    if (!relay.running) {
+      root.state = null
+      backoff.interval = Model.nextRetryDelay(root._attempt)
+      root._attempt += 1
+      backoff.restart()
+    }
+  }
+}
+```
+
+Two `Process` traps the tonearm author hit and documented in the source:
+
+- **A failed spawn never emits `exited()`.** React to `onRunningChanged` (or
+  both) if "it never started" must be handled, not just "it stopped".
+- **`Process.command` assigned while the process is running is silently
+  ignored.** Never reassign `command` on a live `Process`; stop it first, or use
+  a detached one-shot: `Quickshell.execDetached([ctl, verb, arg])`. Push argv as
+  separate entries, never as one joined string.
+
+Always back off before respawning a subscribe loop — with the daemon down the
+CLI exits instantly, so respawning on exit without a delay is a fork loop. Give
+the daemon's own restart path the same treatment (`StartLimitIntervalSec=0`
+plus `Restart=on-failure`), or a burst of failures leaves it dead and the bar
+showing stale data forever.
+
+Ship the one-time install as `setup.sh` at the repo root and document it in the
+README as a numbered step after `omarchy plugin add`:
+
+- Probe dependencies with the **system** interpreter — `/usr/bin/python -c
+  'import dbus_next'`, not whichever `python3` a version manager shadows — since
+  the unit runs under the system interpreter.
+- Fail with the exact fix (`Install with: omarchy pkg add <pkg>`), and offer a
+  `--check` mode that reports whether the unit is active, whether the CLI
+  answers, and whether the plugin still needs pairing.
+- Refuse to run unless it is being executed from the installed plugin directory
+  (`realpath` comparison), so a `git clone` copy cannot install a unit that
+  points at the wrong path.
 
 ### 7. Declare widget settings in the manifest
 
@@ -616,14 +743,13 @@ applies to agent-prepared submissions too.
 ## Red Flags — STOP
 
 - Starting `qs`/`quickshell` as a second process for an official Omarchy plugin.
-- Inventing `plugin.json`, `runtime`, `entry`, an installer hook, or a systemd service instead of using `manifest.json`.
+- Inventing `plugin.json`, `runtime`, `entry`, or an installer hook instead of using `manifest.json`. (An optional helper *daemon* shipped as a systemd **user** service is a different thing — see section 6 — and it never replaces the plugin contract.)
 - Using an `omarchy.*` ID, copying an official ID, or keeping `omarchy.clonedFrom` in a published plugin.
 - Editing packaged Omarchy source instead of cloning into `~/.config/omarchy/plugins/`.
 - Adding symlinks or unsafe/non-relative entry paths.
 - Enabling code before reviewing it. Plugins run unsandboxed inside `omarchy-shell` with the user's permissions.
 - Copying an official example's repository URL, author, description, or identity unchanged.
 - Reading `bar.layoutConfig` or `bar.clickTargets` from a QML binding — that is the binding-loop recipe.
-- Debugging a "still broken" file without clearing `~/.cache/quickshell/qmlcache` first — a stale failed compile replays old errors and sends you chasing a type that actually resolves.
 - Opening a marketplace submission before `omarchy plugin add <url> --enable --yes` succeeds against the pushed commit.
 
 ## Output Contract
