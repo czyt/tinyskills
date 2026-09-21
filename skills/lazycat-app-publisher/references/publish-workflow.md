@@ -311,6 +311,52 @@ locales:
 - 后续：更新应用 + 审核
 - 使用自动化脚本
 
+---
+
+## 🎯 发布目标决策（发布前必做）
+
+**规则：非激励应用默认发布到用户的私有/社区商店（喵喵商店），不上传官方应用商店；提交官方商店必须先获得用户明确确认。**
+
+### 两个发布目标
+
+| 目标 | 渠道 | 机制 | 审核 |
+|------|------|------|------|
+| **私有/社区商店（喵喵商店）** | 默认 [github.com/lazycat-contrib](https://github.com/lazycat-contrib) 组织；用户可自建服务端 | GitHub Actions（lazycat-github-action 的 `stores.private`） | 无官方审核 |
+| **官方应用商店** | 懒猫微服应用商店（appstore.lazycat.cloud） | `lzc-cli appstore publish` 或 lazycat-github-action 的 `stores.official` | 1-3 个工作日 |
+
+### 决策流程
+
+1. 按 [store-rule.md](store-rule.md)「不发放激励的应用类型」清单判断应用类型（图床、导航、博客、RSS、笔记、VNC、VPN、数据库等 22 类）。
+2. **非激励应用** → 默认发布到私有/社区商店（喵喵商店）：
+   - 默认发布到 `lazycat-contrib` 组织；用户可自建服务端（通过 `APPSTORE_URL` 指向自建地址）。
+   - **必须与 GitHub Action 配合使用**：配置 lazycat-github-action 的 `stores.private.enabled: true`，发布走 GitHub Release Asset URL + SHA256 交付。
+   - **不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
+3. 🔴 **CHECKPOINT：** 向用户确认发布目标。只有用户明确要求上传官方商店时才执行官方发布；确认前不得提交官方商店审核。
+4. **激励类应用** → 默认走官方商店流程，提交前向用户说明审核预期（1-3 个工作日）。
+
+### 私有/社区商店的 GitHub Secrets（与 lazycat-github-action 配合）
+
+```text
+APPSTORE_URL                   # 社区商店服务端地址（默认 lazycat-contrib；自建时改为自建地址）
+APPSTORE_TOKEN                 # 社区商店访问令牌
+APP_ID                         # 可选，应用 ID
+PRIVATE_STORE_GROUP_CODES      # 可选，逗号分隔的私有组代码（Secret，禁止写入 workflow 输入）
+```
+
+配置要点（详见 lazycat-github-action skill）：
+
+- `update.strategy: publish` + release 触发（`on: release: types: [published]`）。
+- 发布前确认 GitHub Release Asset `<package-id>-v<version>.lpk` 与本地 SHA256。
+- 私有商店与官方商店是独立开关（`stores.private` / `stores.official`），可只启用私有商店。
+- 双商店发布时官方失败不丢失私有结果（`failureReason: official-publish-failed`）。
+- `skip_if_version_exists: true` 可跳过已在线版本；群组码（group codes）是机密。
+
+### 官方商店发布的强制要求
+
+- 免密登录：OIDC 或 inject 自动填充（见 passwordless-login.md）。
+- 有上传/下载功能必须接入文件选择器拦截（见 file-picker-intercept.md）。
+- 需用户名/密码的应用必须能在商店提供凭证，否则无法上架。
+
 ## 📚 参考资料
 
 ### 官方文档
