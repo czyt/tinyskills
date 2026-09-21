@@ -317,63 +317,19 @@ locales:
 
 **规则：非激励应用默认发布到用户的私有/社区商店（喵喵商店），不上传官方应用商店；提交官方商店必须先获得用户明确确认。**
 
-### 两个发布目标
-
 | 目标 | 渠道 | 机制 | 审核 |
 |------|------|------|------|
-| **私有/社区商店（喵喵商店）** | 默认 [github.com/lazycat-contrib](https://github.com/lazycat-contrib) 组织；用户可自建服务端 | [ca-x/lazycat-github-action](https://github.com/ca-x/lazycat-github-action) 的 `stores.private`，**默认推荐镜像模式** | 无官方审核 |
-| **官方应用商店** | 懒猫微服应用商店（appstore.lazycat.cloud） | `lzc-cli appstore publish` 或 ca-x/lazycat-github-action 的 `stores.official`（要求 LazyCat 交付模式） | 1-3 个工作日 |
+| **私有/社区商店（喵喵商店）** | 默认 [github.com/lazycat-contrib](https://github.com/lazycat-contrib) 组织；用户可自建服务端 | ca-x/lazycat-github-action `stores.private`，**默认推荐镜像模式** | 无官方审核 |
+| **官方应用商店** | appstore.lazycat.cloud | `lzc-cli appstore publish` 或 `stores.official`（LazyCat 交付模式） | 1-3 个工作日 |
 
-**两种发布都使用 ca-x/lazycat-github-action 配合 lazycat-github-action skill**，区别在商店开关与交付模式。
+决策流程：
 
-### 决策流程
-
-1. 按 [store-rule.md](store-rule.md)「不发放激励的应用类型」清单判断应用类型（图床、导航、博客、RSS、笔记、VNC、VPN、数据库等 22 类）。
-2. **非激励应用** → 默认发布到私有/社区商店（喵喵商店）：
-   - 默认发布到 `lazycat-contrib` 组织；用户可自建服务端（通过 `APPSTORE_URL` 指向自建地址）。
-   - 配置 lazycat-github-action 的 `stores.private.enabled: true`，发布走 GitHub Release Asset URL + SHA256 交付。
-   - **社区发布默认推荐镜像模式（mirror）**：`delivery.mode: mirror` + `require_digest_match: true`（mutable 镜像必须），镜像走公共 mirror 前缀（Docker Hub 默认 `docker.1ms.run`，GHCR 默认 `ghcr.1ms.run`；`docker-mirror`/`ghcr-mirror`/`registry-mirrors` 输入或同名 GitHub Variables 覆盖）。
-   - **不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
+1. 按 [store-rule.md](store-rule.md)「不发放激励的应用类型」清单判断应用类型。
+2. **非激励应用** → 默认发布到私有/社区商店（喵喵商店）：默认发布到 `lazycat-contrib` 组织（用户可自建服务端）；用 ca-x/lazycat-github-action 的 `stores.private`，**默认推荐镜像模式**；**不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
 3. 🔴 **CHECKPOINT：** 向用户确认发布目标。只有用户明确要求上传官方商店时才执行官方发布；确认前不得提交官方商店审核。
-4. **激励类应用** → 默认走官方商店流程，提交前向用户说明审核预期（1-3 个工作日）。官方发布要求 LazyCat 交付模式（`delivery.mode: lazycat`），镜像先 `copy-image` 到官方 registry。
+4. **激励类应用** → 默认走官方商店流程（`lzc-cli appstore publish` 或 `stores.official`），提交前向用户说明审核预期（1-3 个工作日）。
 
-### 交付模式速查（ca-x/lazycat-github-action）
-
-| 模式 | 配置 | 用途 |
-|------|------|------|
-| `mirror` | `delivery.mode: mirror` + `require_digest_match: true` | **社区发布默认推荐**；镜像走 mirror 前缀交付，无需 LazyCat registry |
-| `lazycat` | `delivery.mode: lazycat` | 官方发布要求；镜像经 LazyCat registry 交付（copy-image） |
-| `direct` | `delivery.mode: direct` | 直接引用上游镜像 |
-
-```yaml
-# 社区发布（默认推荐镜像模式）
-images:
-  - id: web
-    target: service
-    service: web
-    source: ghcr.io/acme/web
-    channel: stable
-    delivery:
-      mode: mirror
-      require_digest_match: true
-```
-
-### 私有/社区商店的 GitHub Secrets（与 lazycat-github-action 配合）
-
-```text
-APPSTORE_URL                   # 社区商店服务端地址（默认 lazycat-contrib；自建时改为自建地址）
-APPSTORE_TOKEN                 # 社区商店访问令牌
-APP_ID                         # 可选，应用 ID
-PRIVATE_STORE_GROUP_CODES      # 可选，逗号分隔的私有组代码（Secret，禁止写入 workflow 输入）
-```
-
-配置要点（详见 lazycat-github-action skill）：
-
-- `update.strategy: publish` + release 触发（`on: release: types: [published]`）。
-- 发布前确认 GitHub Release Asset `<package-id>-v<version>.lpk` 与本地 SHA256。
-- 私有商店与官方商店是独立开关（`stores.private` / `stores.official`），可只启用私有商店。
-- 双商店发布时官方失败不丢失私有结果（`failureReason: official-publish-failed`）。
-- `skip_if_version_exists: true` 可跳过已在线版本；群组码（group codes）是机密。
+**两种发布都使用 [ca-x/lazycat-github-action](https://github.com/ca-x/lazycat-github-action) 配合 lazycat-github-action skill。交付模式、Secrets、workflow 配置细节以单独安装的 lazycat-github-action skill 为准，本 skill 不重复。**
 
 ### 官方商店发布的强制要求
 
