@@ -1,3 +1,6 @@
 timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-08-24T00:00	working-tree	omarchy-plugin	-	85.0	baseline	-	初始 skill 已完成 Firecrawl 参考整合，带 skill 场景通过；无 skill 场景误用 standalone Quickshell	full_test
 2026-08-24T00:20	working-tree	omarchy-plugin	-	2-1 better	keep	clone 生命周期	补充 clonedFrom、内置调用路由与发布前改 ID 的边界；paired judge 2-1	paired
+2026-09-21T15:10	50379bc	omarchy-plugin	（绝对分仅 triage）	3-0 better	keep	dim4 检查点	4 个显式门禁（启用前/发布前/提 issue 前/owner 批准）；paired 3-0 clear	paired
+2026-09-21T15:20	3d71bda	omarchy-plugin	（绝对分仅 triage）	3-0 better	keep	dim7 去重	合并发布门禁与仓库要求、owner 审批改回指；paired 3-0 slight（收益递减，收尾）	paired
+2026-09-21T15:10	50379bc	omarchy-plugin	(absolute ~85.2 triage)	3-0 better	keep	dim4 检查点 + dim3 失败模式	新增 3x CHECKPOINT + 1x STOP、Platform pitfalls 复现段、marketplace 提交模板；paired 3-0 clear（judge 均指 B 补齐了 A 完全缺失的失败分支与停止标记）	paired
