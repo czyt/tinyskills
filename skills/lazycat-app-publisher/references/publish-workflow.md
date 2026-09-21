@@ -328,6 +328,10 @@ locales:
 2. **非激励应用** → 默认发布到私有/社区商店（喵喵商店）：默认发布到 `lazycat-contrib` 组织（用户可自建服务端）；用 ca-x/lazycat-github-action 的 `stores.private`，**默认推荐镜像模式**；**不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
 3. 🔴 **CHECKPOINT：** 向用户确认发布目标。只有用户明确要求上传官方商店时才执行官方发布；确认前不得提交官方商店审核。
 4. **激励类应用** → 默认走官方商店流程（`lzc-cli appstore publish` 或 `stores.official`），提交前向用户说明审核预期（1-3 个工作日）。
+5. 边界情况：
+   - 类型模糊或不在清单 → 按非激励默认处理并说明依据；
+   - 用户坚持官方商店（非激励类）→ 说明"不参与激励不代表不能上架"，经确认后走官方；
+   - 社区商店凭据缺失（`APPSTORE_URL`/`APPSTORE_TOKEN` 不可用）→ 停止并列缺失项，**不要回退到官方商店**。
 
 **两种发布都使用 [ca-x/lazycat-github-action](https://github.com/ca-x/lazycat-github-action) 配合 lazycat-github-action skill。交付模式、Secrets、workflow 配置细节以单独安装的 lazycat-github-action skill 为准，本 skill 不重复。**
 
