@@ -125,8 +125,112 @@ Both commands must exit successfully. If `OMARCHY_PATH` is unset, locate the ins
 | Listed but not visible | Enable it, confirm the declared kind, and inspect `qs log -p "$OMARCHY_PATH/shell" --tail 100`. |
 | Popup opens only once | Forward the panel lifecycle and use the host bar widget as `owner`. |
 | QML type/import error | Check the installed Omarchy branch and Quickshell version; do not invent a replacement type. |
+| `X is not a type` where X is a QtQuick.Controls type (`ScrollBar`, `Control`, `Label`) | The Controls style module is not loaded for user plugins. Redraw it or use `qs.Ui` — see Platform pitfalls. |
+| `Rectangle is not a type` in a file that obviously imports QtQuick | The file has no import block at all; QML reports the first unresolved type, never "missing imports". |
+| Loads cleanly but renders nothing, log empty | A helper used `Array.isArray()` on a list-like QML value. See Platform pitfalls. |
+| `Binding loop detected for property X` | The binding reads a plugin-API object (`bar.layoutConfig`, `bar.clickTargets`) that the bar replaces on every sync. Cache a scalar instead. |
+| `Invalid property assignment: "implicitHeight" is a read-only property` | `Text` computes its implicit size and has no setter; use `height:`. |
+| A fix does not take effect (same line/column as before) | The QML disk cache kept the failed compile: `rm -rf ~/.cache/quickshell/qmlcache` then `omarchy restart shell`. |
 
-### 5. Exercise the lifecycle
+🔴 CHECKPOINT — do not enable a plugin you have not read. Plugins run
+unsandboxed inside the shell with the user's permissions; `validate` only
+proves the manifest is well-formed.
+
+### 5. Platform pitfalls (third-party plugins)
+
+Each of these is a real failure with a reproduction, not a style preference.
+
+**QtQuick.Controls types do not resolve in a user plugin.**
+
+```text
+Plugin widget io.github.you.plugin failed: BarWidget.qml:307:5: Type TrayMenuList unavailable
+TrayMenuList.qml:262:7: ScrollBar is not a type
+```
+
+`import QtQuick.Controls` parses, but the type itself lives in the Controls
+style module (`QtQuick.Controls.Basic`), which the shell does not load for user
+plugins. Built-in widgets can use it because they are compiled inside the shell
+— a plugin cannot rely on that. Verified dead ends: adding
+`import QtQuick.Controls.Basic`, adding `import qs.Ui`, and moving
+`import Quickshell` to the top all still fail. Redraw the affordance with
+`Rectangle` + theme tokens, or use a `qs.Ui` component that already wraps it.
+
+**List-like QML values are not JS Arrays.**
+
+```js
+Array.isArray(SystemTray.items.values)   // false, even with 5 items in it
+```
+
+So `Array.isArray(items) ? items : []` returns `[]`, `visible:` stays false and
+the widget renders as an empty slot **with no error logged**. Treat anything
+with a numeric `length` as a list and copy it before slicing:
+
+```js
+function asList(value) {
+  var out = []
+  if (!value || typeof value.length !== "number") return out
+  for (var i = 0; i < value.length; i++) out.push(value[i])
+  return out
+}
+```
+
+**Plugin-API objects are replaced on every sync, which loops bindings.**
+
+The bar hands the plugin a **fresh object** for `bar.layoutConfig` on every
+plugin sync, and registering a click target triggers one. A binding that reads
+the layout re-enters itself: partition → new arrays → Repeater rebuilds → click
+targets register → bar re-syncs → `layoutConfig` replaced → partition again,
+reported as `Binding loop detected for property "trayState"`. Never read
+`bar.layoutConfig` / `bar.clickTargets` from a binding; cache a scalar that only
+notifies when its value really changes:
+
+```js
+property bool ownsDropbox: false
+
+function syncLayoutOwnership() {
+  root.ownsDropbox = TrayModel.layoutHasWidget(
+    root.bar ? root.bar.layoutConfig : null, "omarchy.dropbox")
+}
+```
+
+**`Text.implicitHeight` is read-only.** `Item` has writable implicit sizes;
+`Text` computes them. Use `height:`.
+
+**A fixed file can keep failing.** The QML disk cache keeps a failed compile, so
+the same error survives copying a corrected file into the plugin folder. Clear
+it before debugging anything that "should be fixed already":
+
+```bash
+rm -rf ~/.cache/quickshell/qmlcache
+omarchy restart shell
+```
+
+**Same-owner panels and menus do not close each other.** `requestPopout(owner)`
+returns early when `activePopout === owner`, so a panel and a popup menu sharing
+the bar widget as `owner` stay open together. Close the other surface
+explicitly before opening one.
+
+**Debugging a plugin that shows nothing.**
+
+1. `qs log -p "$OMARCHY_PATH/shell" --tail 100` — QML failures are logged, but a
+   component that loads cleanly and renders nothing logs nothing at all.
+2. Add a one-shot probe to the widget, read the log, then remove it:
+   ```qml
+   Timer {
+     interval: 2500
+     running: true
+     onTriggered: console.log("PROBE: shown=" + root.shownItems.length
+       + " visible=" + root.visible + " iw=" + root.implicitWidth
+       + " len=" + SystemTray.items.values.length)
+   }
+   ```
+3. `omarchy-shell shell summon <plugin-id>` — a bar widget exposing
+   `open()`/`close()`/`opened` is summonable, returns `ok` when a live widget
+   exists, and is the cheapest way to exercise a panel without clicking.
+4. `hyprctl layers` — confirms the panel's layer-shell surface exists.
+5. `grim -o <monitor> shot.png` — settles "is it actually on screen".
+
+### 6. Exercise the lifecycle
 
 ```bash
 omarchy plugin list --json
@@ -136,9 +240,13 @@ omarchy-shell shell hide "$PLUGIN_ID"
 
 Test the actual interaction surface: click, Escape, shell summon/hide, disable, re-enable, shell restart, rescan, and removal. A bar widget should show its ID, kind, and `enabled: true` in the JSON listing.
 
-### 6. Prepare and publish
+🔴 CHECKPOINT — that lifecycle run has to pass before the repository is
+published. A plugin that only works until the first rescan is not publishable.
 
-Before sharing, replace the clone ID, remove clone-only metadata, and keep the repository root installable:
+### 7. Prepare and publish
+
+Before sharing, replace the clone ID, remove clone-only metadata, and keep the
+repository root installable:
 
 ```text
 custom-clock/
@@ -146,18 +254,107 @@ custom-clock/
 ├── BarWidget.qml
 ├── Panel.qml        # only if the plugin has a popup
 ├── README.md
-└── LICENSE
+├── LICENSE
+└── tests/           # optional; node --test against the pure helpers
 ```
 
-The publishing gate is a public GitHub repository, valid root `manifest.json`, README, license, safe install/removal behavior, and a validated current commit:
+🛑 STOP — never open a marketplace issue before `omarchy plugin add <url>
+--enable --yes` succeeds against the exact pushed commit, on a machine with no
+maintainer-only context. The issue is bound to a commit; a repository that only
+installs for its author cannot be listed.
+
+The publishing gate is a public GitHub repository, valid root `manifest.json`,
+README with install **and** removal instructions, a license file, and a
+validated current commit:
 
 ```bash
 omarchy plugin add https://github.com/yourname/custom-clock.git --enable --yes
 omarchy plugin update io.github.yourname.clock --yes
-omarchy plugin remove io.github.yourname.clock
+omarchy plugin remove io.github.yourname.clock --yes
 ```
 
-Submit a marketplace listing through the [plugin marketplace issue form](https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml) only after the repository is usable without maintainer-only context.
+### Submit to the marketplace
+
+The marketplace is
+[omacom/omarchy-plugin-marketplace](https://github.com/omacom/omarchy-plugin-marketplace)
+(browse at omarchyplugins.com). It validates repository structure and Omarchy
+Quattro compatibility, runs an Automated Security Baseline against the exact
+commit, and publishes only after a maintainer applies `approved-and-verified`.
+
+Repository requirements: public GitHub repo, plugin at the **root**, root
+`manifest.json`, root README with install and removal instructions, root
+license file, documented external dependencies, globally unique plugin ID
+outside `omarchy.*` (IDs are permanent — search the marketplace first), and
+optionally one root `preview.png` (≤50 MB / 40 MP; the build optimizes it).
+
+🔴 CHECKPOINT — the issue *is* the listing request. Show the finished title and
+body to the plugin owner, get explicit approval, and only then create it. Fix
+problems by editing that same issue; duplicates are rejected.
+
+Create the submission issue:
+
+```bash
+cat > /tmp/omarchy-plugin-submission.md <<'EOF'
+### Repository URL
+
+https://github.com/you/your-plugin
+
+### Category
+
+System
+
+### Tags
+
+bar, quickshell, system
+
+### Suggest a missing tag
+
+_No response_
+
+### Maintainer notes
+
+_No response_
+
+### Submission checklist
+
+- [x] The repository is public and contains installation and removal instructions.
+- [x] I have documented the plugin license and any external dependencies.
+- [x] I confirm that I own or have permission to submit this plugin and its preview assets.
+- [x] The plugin does not overwrite user configuration without explicit consent.
+- [x] I understand that approval is for listing and is not a security review.
+EOF
+
+gh issue create \
+  --repo omacom/omarchy-plugin-marketplace \
+  --title "[Plugin]: Your Plugin Name" \
+  --body-file /tmp/omarchy-plugin-submission.md
+```
+
+What the validator enforces:
+
+- Keep all six `###` headings in that order with the exact checklist text.
+- One category, spelled exactly: `Appearance`, `Desktop`, `Developer Tools`,
+  `Hardware`, `Kids`, `Productivity`, `System`, `Widgets`, `Other`.
+- One to three tags: `ai`, `bar`, `education`, `games`, `hyprland`, `kids`,
+  `launcher`, `media`, `power-management`, `quickshell`, `security`, `system`,
+  `vpn`, `workspaces`.
+- The title must start with `[Plugin]:`.
+
+A validation comment and a security-baseline comment appear on the issue; only
+a maintainer's `approved-and-verified` publishes the listing. If no bot comment
+appears, edit the issue (title prefix, heading order, exact category and all
+five checkboxes are the usual causes) — editing re-runs detection. Fix problems
+in the same issue instead of opening a duplicate.
+
+To publish a newer commit for an existing listing, use the
+[verification form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=verify-plugin.yml)
+and give the exact 40-character SHA; the listed snapshot stays unchanged until
+the new commit passes validation, the baseline and maintainer review.
+
+When preparing a submission for someone else: read their manifest, README and
+license first, pick the category and tags from the allowed values, keep every
+heading and checklist line intact, show the finished title and body to the
+owner, and only create the issue after the owner explicitly approves it.
 
 ## Red Flags — STOP
 
@@ -168,6 +365,10 @@ Submit a marketplace listing through the [plugin marketplace issue form](https:/
 - Adding symlinks or unsafe/non-relative entry paths.
 - Enabling code before reviewing it. Plugins run unsandboxed inside `omarchy-shell` with the user's permissions.
 - Copying an official example's repository URL, author, description, or identity unchanged.
+- Using a `QtQuick.Controls` type (e.g. `ScrollBar`) in a user plugin — it will not resolve; see Platform pitfalls.
+- Reading `bar.layoutConfig` or `bar.clickTargets` from a QML binding — that is the binding-loop recipe.
+- Debugging a "still broken" file without clearing `~/.cache/quickshell/qmlcache` first.
+- Opening a marketplace submission before `omarchy plugin add <url> --enable --yes` succeeds against the pushed commit.
 
 ## Output Contract
 
