@@ -365,8 +365,9 @@ lzc-cli lpk info app.lpk
    - 使用 [ca-x/lazycat-github-action](https://github.com/ca-x/lazycat-github-action)（`stores.private`），**社区发布默认推荐镜像模式**；交付模式、Secrets 等配置细节查单独安装的 lazycat-github-action skill。
    - **不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
    - 🔴 **CHECKPOINT：** 向用户确认发布目标。只有用户明确要求上传官方商店时才执行官方发布；确认前不得提交官方商店审核。
-   - 用户坚持官方商店（非激励类）→ 说明"不参与激励不代表不能上架"，经用户确认后走官方流程。
-   - 社区商店凭据缺失（`APPSTORE_URL`/`APPSTORE_TOKEN` 不可用）→ 停止并列缺失项，**不要回退到官方商店**。
+   - **边界情况：**
+     - 用户坚持官方商店（非激励类）→ 说明"不参与激励不代表不能上架"，经用户确认后走官方流程。
+     - 社区商店凭据缺失（`APPSTORE_URL`/`APPSTORE_TOKEN` 不可用）→ 停止并列缺失项，**不要回退到官方商店**。
 3. **激励类应用**（不在排除清单）→ 默认走官方商店流程（`lzc-cli appstore publish` 或 `stores.official`），提交前向用户说明审核预期（1-3 个工作日）。官方商店另有强制要求：免密登录（[passwordless-login.md](references/passwordless-login.md)）、上传/下载必须接入文件选择器拦截（[file-picker-intercept.md](references/file-picker-intercept.md)）。
 
 ```bash
