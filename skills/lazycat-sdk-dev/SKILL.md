@@ -1,6 +1,6 @@
 ---
 name: lazycat-sdk-dev
-description: Use when building LazyCat SDK integrations in Go/JS, WebShell frontend features, notifications, MCP providers, MCP gateway aggregation, Skill/MCP resource discovery, dynamic MCP tool lists, import_resources/resource_exports, .lzcx app access, or user-delegated LazyCat app-to-app calls.
+description: Use when building LazyCat SDK integrations in Go/JS, WebShell frontend features, notifications, MCP providers, MCP gateway aggregation, Skill/MCP resource discovery, dynamic MCP tool lists, import_resources/resource_exports, .lzcx app access, user-delegated LazyCat app-to-app calls, remote network programming via remotesocks/GetNetstack, or cross-network TCP/UDP dial/listen and port forwarding.
 ---
 
 # LazyCat SDK 开发
@@ -25,6 +25,7 @@ description: Use when building LazyCat SDK integrations in Go/JS, WebShell front
 | [references/js-sdk.md](references/js-sdk.md) | **JavaScript/TypeScript SDK 参考** - 基础用法，API 操作，前端集成 |
 | [references/extensions.md](references/extensions.md) | **扩展模块** - minidb，file-pickers，跨应用通信 |
 | [references/mcp-resources.md](references/mcp-resources.md) | **MCP / Skill 资源** - 发现微服资源、动态聚合 MCP tools、应用对外提供 MCP 的 LazyCat 适配 |
+| [references/remotesocks.md](references/remotesocks.md) | **远程网络编程** - remotesocks/hportal：GetNetstack 跨网络 dial/listen（TCP/UDP/多播）、netmap 全端口转发案例、开发方向 |
 
 ---
 
@@ -81,6 +82,8 @@ const api = new lzcAPIGateway(window.location.origin, false)
 | 发现微服 Skill/MCP | `import_resources` + 文件扫描 | [mcp-resources.md](references/mcp-resources.md) |
 | 对外提供 MCP | `/mcp` + `resource_exports` | [mcp-resources.md](references/mcp-resources.md) |
 | 动态聚合 MCP tools | MCP client `ListTools` + namespaced proxy | [mcp-resources.md](references/mcp-resources.md) |
+| 跨网络访问/发现（远程网络编程） | `gohelper.GetNetstack` + remotesocks | [remotesocks.md](references/remotesocks.md) |
+| 全端口转发 / 流量转发工具 | ingress `send_port_info` + `remotesocks.ForwardConn` | [remotesocks.md](references/remotesocks.md) |
 
 #### Step 2.2: 添加用户上下文（HTTP Handler 必须）
 
@@ -342,6 +345,19 @@ gw.Box.Shutdown(ctx, &common.ShutdownRequest{
 })
 ```
 
+### 5. 跨网络访问（远程网络编程）
+
+```go
+// "" = 微服所在物理网络；传 hclient id = 该客户端设备所在物理网络
+// hclient id 来自 gw.HClients.ListHClients(uid)
+ns := gohelper.GetNetstack("")
+
+conn, _ := ns.DialContext(ctx, "tcp", "192.168.1.1:80")       // 访问目标网络中的 TCP 服务
+pc, _ := ns.ListenPacket(ctx, "udp", "239.255.255.250:1900")  // SSDP/mDNS 多播发现
+```
+
+`GetNetstack` 返回与标准库 net 同构的 `spec.Netstack`（DialContext/Listen/ListenPacket）。完整说明与 netmap 转发案例见 [references/remotesocks.md](references/remotesocks.md)。
+
 ---
 
 ## 前端客户端能力
@@ -479,6 +495,9 @@ const files = await pickFiles({
 | 访问 `.lzcx` 返回 401/412 | 缺少 `lzcapp.user_delegate` 或没有用户票据 | 声明权限，并从真实用户请求保存 `X-HC-USER-TICKET` |
 | 动态聚合工具缺失 | 上游 provider 未启用或 `ListTools` 超时 | 记录 provider 级错误，保留已有工具列表，后台重试刷新 |
 | LazyCat header 被外部伪造 | 无条件信任 `X-HC-User-ID` | 只在 LazyCat 部署环境开关开启时信任平台 header；外部请求走 Bearer token |
+| 跨网络访问失败 | 目标 hclient 离线或地址不可达 | 先检查 `HClient.is_online`；用超时 ctx 包裹 dial/listen；区分「设备离线」与「目标网络不可达」 |
+| 多播发现收不到响应 | 用 `Listen` 而非 `ListenPacket`，或未监听多播地址 | 多播地址（如 `239.255.255.250:1900`）必须用 `ListenPacket` |
+| 全端口转发不生效 | ingress 缺少 `publish_port` / `send_port_info` | 显式声明 `publish_port: 0-65536` + `send_port_info: true`（80/443 需 `yes_i_want_80_443: true`） |
 
 ### 边界条件处理
 

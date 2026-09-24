@@ -28,5 +28,15 @@
     "id": 6,
     "prompt": "Go 后端已经知道 uid 和目标 uniqueDeivceId，如何向该设备发送 LazyCat 通知？",
     "expected": "应先用 APIGateway 的 ListEndDevices 找到在线且 deviceApiUrl 非空的设备；用默认 CA/应用证书建立 TLS gRPC，RequestAuthToken 后设置 lzc_dapi_auth_token，再调用 localdevice.NotificationService.Notify；需要 15s 左右超时并关闭 gateway/connection。"
+  },
+  {
+    "id": 7,
+    "prompt": "我想写一个 LazyCat 应用，扫描用户手机当前所在局域网里的设备（SSDP 发现），并访问该网络里路由器的管理页，应该用什么接口？",
+    "expected": "应说明用 lzc-sdk gohelper.GetNetstack(target) 获取 spec.Netstack；target 为空表示微服所在网络，传 hclient id 表示该客户端设备所在网络；hclient id 从 gw.HClients.ListHClients 获取且要检查在线；TCP 访问用 DialContext；SSDP 用 ListenPacket 监听 239.255.255.250:1900 多播地址；不要暴露无认证的 socks 服务。"
+  },
+  {
+    "id": 8,
+    "prompt": "netmap 这个官方项目是怎么实现全端口动态转发的？remotesocks 在里面起什么作用？",
+    "expected": "应说明 netmap 用 lzc-deploy-params.yml 声明部署参数（target/listen.port），lzc-manifest.yml 模板渲染；ingress 配置 publish_port: 0-65536 + send_port_info: true（系统在 TCP 流开头附 2 字节小端原始入站端口，80/443 需 yes_i_want_80_443）；后端读端口号后 dial 目标 IP:port，用 remotesocks.ForwardConn(ctx, TCPBufSize, t, conn) 双向转发。"
   }
 ]
