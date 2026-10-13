@@ -1,0 +1,27 @@
+[
+  {
+    "id": "full-publish-flow",
+    "prompt": "帮我在懒猫攻略平台写一篇我家应用《XX备忘》的攻略，应用地址是 https://xx.tinycat.heiyu.space，源码在 ~/code/go/xx。你负责写文章跟截图，需要登录的你打开 web 我来登录。",
+    "expected": "先读源码梳理功能；打开应用地址发现登录页后停下来用 AskUserQuestion 请用户登录；截图前脱敏设备 ID 等字段；用本地 HTTP + ClipboardEvent 粘贴自动上传截图；按动机→功能（先场景后操作）→原理→边界结构写文；workshop 填标题正文，封面分类让用户完成；确认 publish-finished 后收尾清理本地服务。"
+  },
+  {
+    "id": "screenshot-masking",
+    "prompt": "我要给攻略配几张截图，但界面里有设备 ID 和我配的 Server酱 SendKey，截图会不会泄露？",
+    "expected": "说明截图前用 eval 改 DOM 文本脱敏（设备 ID 保留前 4 位其余打点、SendKey 显示 SCT****），比事后修图可靠；列出已知敏感位；提醒不要截登录态残留页面。"
+  },
+  {
+    "id": "upload-fallback",
+    "prompt": "我用粘贴自动上传截图，粘贴完编辑器里没出现图片链接，怎么办？",
+    "expected": "按失败模式表排查：focus 是否在 dispatch 前、dispatch 返回值、XHR 是否有 applyWrite + COS PUT；仍失败回退到让用户用可见的拖拽/工具栏上传入口手动传，不要死磕。"
+  },
+  {
+    "id": "article-shape",
+    "prompt": "攻略写出来同事说像产品说明书，怎么改？",
+    "expected": "指出失败模式是功能清单式；每个功能先写「为什么需要它」的场景（比如关灯任务先写睡前担心灯没关），再讲操作；原理部分深入浅出不贴源码；按信息依赖排序章节。"
+  },
+  {
+    "id": "nav-desync",
+    "prompt": "共享浏览器 navigate 到应用地址后，eval 读到的还是攻略平台的 URL，页面卡死了吗？",
+    "expected": "解释浏览器层导航与页面执行不同步的已知症状；给出 reload / 检查导航历史 / 让用户关标签页重开三步回退，不是死循环重试。"
+  }
+]
