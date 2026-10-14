@@ -1,0 +1,3 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-10-13T18:10	90d6dee	lazycat-playground-writer	-	86.6	baseline	-	初始评估：dim5 满分，短板为上传弱断言/选择器魔数/前置条件未声明	dry_run
+2026-10-13T18:25	6f4b64d	lazycat-playground-writer	86.6	3-0 better	keep	dim4检查点+dim3失败模式+dim5具体性	新增前置条件节、登录/发布两处🔴CHECKPOINT、上传逐张核验与重试、.CodeMirror失效降级行、选择器时效声明	paired
