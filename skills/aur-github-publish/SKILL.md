@@ -137,6 +137,7 @@ _deb_aarch64="app_${pkgver}_arm64.deb"
 source_x86_64=("${_deb_x86_64}::https://example/latest/app_amd64.deb")
 source_aarch64=("${_deb_aarch64}::https://example/latest/app_arm64.deb")
 noextract=("${_deb_x86_64}" "${_deb_aarch64}")
+options=('!strip' '!debug')
 sha256sums_x86_64=('SKIP')
 sha256sums_aarch64=('SKIP')
 
