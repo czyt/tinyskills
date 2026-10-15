@@ -13,6 +13,7 @@ pkgdesc="{description}"
 arch=('x86_64')
 url="{homepage}"
 license=('{license}')
+options=('!strip' '!debug')  # 预编译二进制默认：防 strip 破坏 Go/Rust 二进制、不生成 debug 包
 depends=({dependencies})
 provides=('{provides}')
 conflicts=('{conflicts}')
@@ -47,6 +48,7 @@ package() {
 | `conflicts` | 冲突包 | `('myapp' 'myapp-git')` |
 | `replaces` | 替换包 | `('oldapp')` |
 | `install` | 安装脚本 | `'{pkgname}.install'` |
+| `options` | makepkg 行为控制 | `('!strip' '!debug')` 预编译二进制默认 |
 
 ## 架构支持
 

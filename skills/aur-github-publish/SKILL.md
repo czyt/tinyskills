@@ -268,6 +268,7 @@ curl -fsSL "https://aur.archlinux.org/rpc/?v=5&type=info&arg={pkgname}"
 - 不要在要求 GitHub 保持 `SKIP` 时回写真实 checksum。
 - 不要依赖 `data.tar.gz`、`data.tar.xz` 或 `control.tar.xz` 永远固定。
 - 不要在 GitHub 包目录提交 `.SRCINFO`。
+- 不要给预编译二进制包漏掉 `options=('!strip' '!debug')`：默认 strip 可能破坏 Go/Rust 二进制，debug 包成倍增大体积。
 - 不要只看 GitHub Action 绿色；验证 AUR Git 内容与 RPC 状态。
 - 不要为触发首次发布默认伪造旧版本；优先显式首次发布/force 路径。
 
