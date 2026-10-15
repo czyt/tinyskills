@@ -18,5 +18,10 @@
     "id": 4,
     "prompt": "帮我发布一个多架构 deb 到 AUR。上游下载地址永远是 latest/app_amd64.deb 和 latest/app_arm64.deb，URL 没版本号，每次更新会原地覆盖，GitHub 仓库里的 PKGBUILD checksum 必须保持 SKIP，由发布 action 自动计算。",
     "expected": "从 deb control 元数据读取并交叉校验版本；使用 ETag 或 Last-Modified 作为下载优化信号并保存在 GitHub-only 状态文件；ETag 变化但版本不变时 bump pkgrel；PKGBUILD 保持 SKIP，deploy action 使用 updpkgsums；明确 assets 包含规则并排除状态文件；验证首次空 AUR 仓库真实推送和索引延迟"
+  },
+  {
+    "id": 5,
+    "prompt": "帮我把 suanmei/markdown-picker 这个 Go 写的 CLI 工具发布到 AUR，GitHub Release 提供 linux-amd64 和 linux-arm64 的预编译二进制。生成 PKGBUILD。",
+    "expected": "生成的 PKGBUILD 包含 options=('!strip' '!debug')（预编译 Go 二进制默认），多架构 source 用不同本地文件名，checksum 用 SKIP + updpkgsums"
   }
 ]
