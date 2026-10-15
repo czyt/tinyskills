@@ -121,6 +121,7 @@ curl --fail --silent --show-error --location \
 - `source_x86_64` 与 `source_aarch64` 分开；`package()` 按 `$CARCH` 选择文件。
 - `provides` / `conflicts` 与实际可执行文件、已有包一致。
 - 预编译包声明运行依赖；构建工具放入 `makedepends`。
+- 预编译二进制包默认声明 `options=('!strip' '!debug')`：不重复 strip 上游已处理的二进制（Go/Rust 二进制可能被 strip 破坏），也不生成成倍增大体积的 debug 包。仅源码构建且确需符号分离时才调整。
 - 本地 launcher、patch、service 等出现在 `source=()` 时，必须同时列入 deploy action 的 `assets`。
 
 多架构 mutable deb 最小结构：
