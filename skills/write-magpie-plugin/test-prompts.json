@@ -1,0 +1,5 @@
+[
+  {"id": 1, "prompt": "帮我写一个 magpie 插件，把 FooAI（一个 OpenAI 兼容的编程套餐，API key 登录，有 foo-fast 和 foo-pro 两个模型）接入 magpie。", "expected": "按最小模板生成：package.json（keywords 含 opencode/opencode-plugin）+ index.mjs（config 用 ??= 声明供应商、npm 用 @ai-sdk/openai-compatible、auth.methods 用 type:api、loader 返回 baseURL+fetch 签名），并提示沙箱测试命令"},
+  {"id": 2, "prompt": "我的 magpie 插件登录后每隔几小时就要求重新登录，token 过期了。怎么让它自动续期？", "expected": "建议加 auth.refresh 钩子（refreshLead 默认 5 分钟、同一时间只续一次、失败抛 signIn:expired）；若需兼容 OpenCode，fetch 里保留续期检查；说明 refresh 返回字段合并覆盖语义"},
+  {"id": 3, "prompt": "我写了个 magpie 中间件想给每个请求加自定义 header 并拦截某些模型，为什么本地测试总是不生效/报错？", "expected": "指出中间件跑在 moejs 引擎（非 Bun）：无 Node API/fetch/timer、只能相对导入、事件 50ms/请求 250ms 超时；onRequest 改 body.model 可改路由、ctx.reject 拒绝；声明方式 *.middleware.js 或 magpie.middleware 字段；修改后每秒自动重载"}
+]
