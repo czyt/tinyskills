@@ -152,4 +152,5 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 
 - 本 skill 是决策与骨架参考；钩子的完整字段、usage 返回结构、宿主协议、pi 细节查 [references/plugin-doc-full.md](references/plugin-doc-full.md) 对应章节。
 - 实现前先看社区同名或同厂商的插件（[magpie-community/plugins](https://github.com/magpie-community/plugins)）有没有现成登录逻辑可参考；社区仓库的 `bun scripts/check.mjs <name>` 可离线校验钩子。
+- **Agent skill 形态的范例**：[magpie-quota](references/example-magpie-quota-skill.md) 是社区官方 skill（让 agent 查额度/等待恢复），展示了好的 skill 写法——frontmatter description 只写触发条件、命令+JSON 结构速查、"Don't" 黑名单收尾、明确 exit codes。给 magpie 生态写 skill（社区仓库 `skills/<name>/SKILL.md`）或写插件时可参照它的结构与克制。
 - 内容基于 magpie v0.1.676+ 文档（2026-10 抓取）；`auth.refresh` 需 v0.1.684+，`auth.checkin` 需 v0.1.1083+。
