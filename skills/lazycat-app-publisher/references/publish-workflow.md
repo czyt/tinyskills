@@ -340,7 +340,7 @@ locales:
 - 免密登录：OIDC 或 inject 自动填充（见 passwordless-login.md）。
 - 有上传/下载功能必须接入文件选择器拦截（见 file-picker-intercept.md）。
 - 需用户名/密码的应用必须能在商店提供凭证，否则无法上架。
-- 应用名称规范：顶层 `name` 用产品原名，不拼中文类别词（❌ `HealthTrack 家庭健康管家`）；"是什么"放 `locales` description；各语言 `name` 独立命名，未命中回退顶层（详见 SKILL.md「应用命名规范」）。
+- 应用名称规范：英文名和中文名二选一，不拼接（❌ `FlyCMS 飞翔内容管理系统`）；中文名放 `locales.zh.name`，"是什么"放 `locales` description；未命中回退顶层（详见 SKILL.md「应用命名规范」）。
 
 ## 📚 参考资料
 
