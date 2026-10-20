@@ -873,6 +873,13 @@ application:
 
 **⚠️ 重要：LPK v2 格式必须设置 `min_os_version: 1.5.0`**
 
+**应用命名规范（防止中英文混杂）：**
+
+- 顶层 `name` 用产品自己的名字，保持上游原名（`Vaultwarden`、`Jellyfin`、`WeKnora`）；纯中文产品用中文名（`易站`）。**不要把英文产品名和中文类别词拼在一起**——`HealthTrack 家庭健康管家`、`FlyCs 内容管理系统`、`Keues 排队叫号` 这类"英文名+中文功能说明"是错误写法。
+- "它是什么"放 `locales` 的 description，不放 name：`HealthTrack` 的"现代化家庭健康档案系统"属于 `description`，不属于 `name`。
+- 各语言名称独立命名，不逐字互译：`locales.zh` 下可以写中文社区惯用名（如 `密码管理器` 若上游无正式中文名则仍用 `Vaultwarden`），`locales.en` 用上游原名。未命中语言回退顶层 `name`。
+- 全小写的上游品牌名保留原大小写（`vaultwarden` 不写成 `Vaultwarden`，除非上游文档混用）。
+
 ```yaml
 # package.yml - 静态元数据（含自动生成的权限声明）
 package: community.lazycat.app.myapp
@@ -985,6 +992,7 @@ locales:
 | 多镜像 manifest 未确认 service 就复制/发布 | 用户无法判断到底更新了哪个容器 | 先列出 `services.*.image`，要求显式选择或读取 `.lazycat-release.env` 并打印 |
 | 构建后默认发布 | 未审核的 LPK 进入应用商店流程 | 只有用户要求或传 `--publish` 时调用 `lzc-publish` |
 | 非激励应用直接 `lzc-cli appstore publish` 提交官方商店 | 未获用户确认即进入官方审核流程 | 默认发布到私有/社区商店（喵喵商店，`stores.private`）；提交官方商店前必须用户确认（见 Step 3.2） |
+| 应用名称拼成「英文名+中文类别词」（如 `HealthTrack 家庭健康管家`） | 商店列表中英文混杂，观感劣质；官方审核指南要求资料本地化规范 | 顶层 `name` 用产品原名；"是什么"写进 `locales` 的 `description`；各语言 `name` 独立命名（见 LPK v2 示例的命名规范） |
 | `copy-image` 解析不到 registry 地址仍继续 | manifest 指向不存在或旧镜像 | 立即停止，保留文件，提示用户贴出完整输出 |
 | 只改 manifest 不改 `package.yml` 版本 | 构建产物版本混乱，更新审核失败 | 同步更新 `package.yml` 顶层 `version` |
 
