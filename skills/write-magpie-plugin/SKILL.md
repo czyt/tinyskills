@@ -99,7 +99,8 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | `auth.methods` | OpenCode | 登录方式列表 | method 类型只有 `api`（key）和 `oauth`（url+callback，`method: "auto"` 自动完成 / `"code"` 用户粘贴）；method 上的 `prompts` 在登录前依次提问，问题类型 `text`/`select`/`password`（`password` 是 magpie 专属，OpenCode 只有前两种） |
 | `auth.loader(getAuth)` | OpenCode | 每账号一次，返回 `baseURL`/`apiKey`/`headers`/`fetch` | 登录信息变化后重新运行；每账号作用域，状态按 auth 存，不放供应商级模块变量 |
 | `provider.models(provider, {auth})` | OpenCode | 账号相关的模型列表 | 失败时返回 `provider.models` 或抛异常，magpie 保留原列表；登录失效抛 `{signIn: "expired"}` |
-| `auth.usage(getAuth)` | **magpie** | 额度用量，显示在 `magpie quota` | 返回 `{plan, windows:[{name, used, resetsAt, span}], …}`，字段全可选 |
+| `auth.usage(getAuth)` | **magpie** | 额度用量，显示在 `magpie quota` | 返回 `{plan, windows:[{name, used, resetsAt, span}], …}`，字段全可选；拉取失败返回 `{error, signIn: "kept"}` 降级，别抛异常把账号标成失效 |
+| `auth.options` | **magpie** | 供应商编辑器里的开关卡片 | `[{key, label, description, default, confirm}]`，confirm 说明将发生的写操作（如"会创建令牌"）；v0.1.676 文档没有，以社区仓库为准 |
 | `auth.refresh(auth)` | **magpie** | token 续期，magpie 统一调度 | 同一时间只续一次（refresh token 一次性也安全）；失败带 `signIn: "expired"`；OpenCode 忽略此钩子，fetch 里保留续期检查保兼容 |
 | `auth.checkin(getAuth)` | **magpie** | 每日签到 | 返回 `{outcome: "claimed"/"done"/"ineligible"/…}`；**绝不自动解验证码**，返回 `captcha`。出处：[社区贡献契约](https://github.com/yetone/magpie/blob/main/docs/subsystems/provider-plugins.md#a-plugins-daily-check-in)，需 v0.1.1083+（本 skill 所附文档抓取自 v0.1.676 时代，此钩子以社区仓库为准） |
 | `"chat.headers"(input, output)` | OpenCode | 每请求加头（会话/缓存头） | `input.sessionID` 同对话不变 |
@@ -107,7 +108,8 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 ## 关键行为规则
 
 - **入口加载**：`exports["./server"]` → `main` → `exports["."]` → `index.ts/js/mjs/cjs`。**入口导出的每个函数都会被当作插件调用**——辅助函数别放入口，社区惯例 `export const _internal = {...}`。
-- **多账号**：第一账号存供应商 id 下，其余 `id#xxxxxx`；用 `accountId`/`metadata.email`/`email` 命名，至少存一个。同 `accountId` 的登录替换原账号。
+- **多账号**：第一账号存供应商 id 下，其余 `id#xxxxxx`；用 `accountId`/`metadata.email`/`email` 命名，至少存一个。同 `accountId` 的登录替换原账号。API key 方式没有邮箱可拿：加一个 `prompts` 备注名提问（key 用 `email`，回答自动进 `metadata.email`），多账号时账号列表才分得清；不填退化为 key 尾几位。api 方式的 `authorize` 拿不到用户粘的 key（key 由宿主单独保存），登录时验证不了——坏 key 靠首次 models 拉取的 401 → `signIn: "expired"` 捕获，社区无先例可绕过。
+- **协议/地址分流（单 provider 混多协议）**：托管混合模型（Claude+GPT+Gemini 之类）只需一个 provider。`models` 钩子返回的是 OpenCode Model 形状，分流用 **`api: { id, url, npm }`**（社区 zed/zcode 写法）；`provider: { npm, api }` 是 config 静态声明形状，写进 models 钩子不生效。动态清单生成的模型补齐 `status: "active"`、`cost`、`capabilities` 中性默认，避免宿主显示异常。
 - **登录状态**：默认 401 标记账号、成功清除。用 `X-Magpie-Sign-In` 响应头精确控制：`expired`（拒绝登录）/ `kept`（这个 401 是别的问题）/ `renewed`（已续期）。
 - **供应商 id 冲突**：id 被内置订阅/预设占用时自动变成 `<id>-plugin`；选一个只属于你的 id。
 - **依赖**：`bun add` 安装、**不运行安装脚本**（依赖 postinstall 构建的包无法用）；Bun 的 `fetch`/`crypto`/`fs`/`$` 够用。可以调厂商 CLI（`$` 或 `child_process`），错误信息里说明未装时怎么办。
@@ -141,6 +143,9 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | token 过期反复登出 | 加 `auth.refresh`（refreshLead 默认 5 分钟）；OpenCode 兼容场景在 fetch 里保留续期检查 |
 | 401 误标登录失效 | 该 401 是别的问题时，fetch 返回头 `X-Magpie-Sign-In: kept` |
 | 模型列表拉取失败全丢 | models 钩子失败时返回 `provider.models` 原样兜底；登录失效抛 `{signIn: "expired"}` |
+| 模型分流写了 `provider: {npm, api}` 不生效 | 那是 config 声明形状；`models` 钩子返回的 Model 要用 `api: { id, url, npm }` |
+| 多账号在列表里分不清 | api 方式无邮箱：加 `prompts` 备注名（key 用 `email`）存 `metadata.email` 命名 |
+| 拉用量失败把账号标成失效 | usage 钩子返回 `{error, signIn: "kept"}` 降级，别抛异常 |
 | 其他插件能读到你的 API key | loader 的 `apiKey` 放了真 key：改固定占位符，真 key 只进 fetch 请求头 |
 | loader 的 fetch 把 key 发到别的域名 | 宿主会把它交给其他插件调用：fetch 里校验目标 origin 是厂商域名，不是就抛错 |
 | 中间件钩子不生效 | 检查运行环境限制（moejs：无 Node API；事件 50ms 超时）；`events` 导出只对有名字的事件 API 有效，Chat/Gemini 别写 |
@@ -175,6 +180,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 
 - 本 skill 是决策与骨架参考；钩子的完整字段、usage 返回结构、宿主协议、pi 细节查 [references/plugin-doc-full.md](references/plugin-doc-full.md) 对应章节。
 - 实现前先看社区同名或同厂商的插件（[magpie-community/plugins](https://github.com/magpie-community/plugins)）有没有现成登录逻辑可参考；社区仓库的 `bun scripts/check.mjs <name>` 可离线校验钩子。
-- **单文件全功能范例**：[egenchen/magpie-packycode](https://github.com/egenchen/magpie-packycode)——key 占位符、fetch 域名防护、config 合并、动态模型、usage 卡片、多 key 故障转移、node --test 单测 + CI，一个文件看全这些设计（书生端砚插件 ca-x/magpie-intern-ai 也照此结构）。
+- **单文件全功能范例**：[egenchen/magpie-packycode](https://github.com/egenchen/magpie-packycode)——key 占位符、fetch 域名防护、config 合并、动态模型、usage 卡片（失败降级 `signIn: "kept"`）、`auth.options` 开关卡片（含 confirm）、多 key 故障转移、node --test + CI，UI/交互写法看它一个文件够了。
+- **单 provider 多协议分流范例**：社区仓库 [packages/zed](https://github.com/magpie-community/plugins/tree/main/packages/zed)（单 provider 托管 Claude/GPT/Gemini，`api: {id, url, npm}` 按模型分协议）与 [packages/zcode](https://github.com/magpie-community/plugins/tree/main/packages/zcode)（`X-Magpie-Sign-In: kept` 响应包装、select+hint 登录提问、usage 窗口换算）；API key 多账号备注名同见 zcode/packycode。
 - **Agent skill 形态的范例**：[magpie-quota](references/example-magpie-quota-skill.md) 是社区官方 skill（让 agent 查额度/等待恢复），展示了好的 skill 写法——frontmatter description 只写触发条件、命令+JSON 结构速查、"Don't" 黑名单收尾、明确 exit codes。给 magpie 生态写 skill（社区仓库 `skills/<name>/SKILL.md`）或写插件时可参照它的结构与克制。
 - 内容基于 magpie v0.1.676+ 文档（2026-10 抓取）；`auth.refresh` 需 v0.1.684+，`auth.checkin` 需 v0.1.1083+。
