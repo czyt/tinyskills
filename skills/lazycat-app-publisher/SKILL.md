@@ -873,11 +873,11 @@ application:
 
 **⚠️ 重要：LPK v2 格式必须设置 `min_os_version: 1.5.0`**
 
-**应用命名规范（不要把英文名和中文名混写在一起）：**
+**应用命名规范（名称只承载"软件叫什么"）：**
 
-- 应用名称**二选一**：要么用产品英文名/原名（`FlyCMS`、`Vaultwarden`、`WeKnora`），要么用正式中文名（`飞翔内容管理系统`——仅当上游有正式中文名或中文社区有公认译名）。**禁止拼接**：`FlyCMS 飞翔内容管理系统`、`HealthTrack 家庭健康管家`、`Keues 排队叫号` 这类"英文名 + 中文名/类别词"是错误写法。
-- 中文语境的说明放 `locales.zh` 的 `description`（"一款内容管理系统"），不放 name。
-- 各语言名称独立：`locales.zh.name` 用中文名（如 `飞翔内容管理系统`），`locales.en.name` 用英文名（`FlyCMS`）；未命中语言回退顶层 `name`。
+- 名称里不应杂糅软件名称以外的任何内容——翻译、类别、用途描述都不是名称的职责，那是 `description` 的工作。
+- 判定：`FlyCMS 飞翔内容管理系统`、`HealthTrack 家庭健康管家`、`Keues 排队叫号` 全部错误——中文名/类别词/用途说明混进了名称。名称二选一：`FlyCMS` 或（上游有正式中文名时）`飞翔内容管理系统`。
+- 职责划分：`name` = 软件叫什么（`FlyCMS`）；`locales.zh.name` = 中文语境叫什么（有正式译名才写）；`description` = 它是什么、干什么用（"一款内容管理系统"）。
 - 品牌大小写跟上游（`vaultwarden` 保持全小写）。
 
 ```yaml
@@ -992,7 +992,7 @@ locales:
 | 多镜像 manifest 未确认 service 就复制/发布 | 用户无法判断到底更新了哪个容器 | 先列出 `services.*.image`，要求显式选择或读取 `.lazycat-release.env` 并打印 |
 | 构建后默认发布 | 未审核的 LPK 进入应用商店流程 | 只有用户要求或传 `--publish` 时调用 `lzc-publish` |
 | 非激励应用直接 `lzc-cli appstore publish` 提交官方商店 | 未获用户确认即进入官方审核流程 | 默认发布到私有/社区商店（喵喵商店，`stores.private`）；提交官方商店前必须用户确认（见 Step 3.2） |
-| 应用名称中英文混写（如 `FlyCMS 飞翔内容管理系统`、`HealthTrack 家庭健康管家`） | 名称是「英文名+中文名」拼接，商店列表观感劣质；官方审核指南要求资料本地化规范 | 名称二选一：英文名或正式中文名，不拼接；中文名放 `locales.zh.name`，"是什么"放 `locales` 的 `description`（见 LPK v2 示例的命名规范） |
+| 应用名称杂糅翻译或用途描述（如 `FlyCMS 飞翔内容管理系统`、`HealthTrack 家庭健康管家`） | 名称越权承担了 description 的职责；名称只回答"软件叫什么"，商店列表观感劣质 | 名称只留软件名（`FlyCMS`）；中文名放 `locales.zh.name`（有正式译名才写）；用途/类别放 `description`（见 LPK v2 示例的命名规范） |
 | `copy-image` 解析不到 registry 地址仍继续 | manifest 指向不存在或旧镜像 | 立即停止，保留文件，提示用户贴出完整输出 |
 | 只改 manifest 不改 `package.yml` 版本 | 构建产物版本混乱，更新审核失败 | 同步更新 `package.yml` 顶层 `version` |
 
