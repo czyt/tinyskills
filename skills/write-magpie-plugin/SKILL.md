@@ -18,7 +18,7 @@ description: Use when 为 magpie（usemagpie.ai）编写供应商插件、把某
    - 模型走什么 API？见下方「API 对照表」，决定 `npm` 字段。
    - 模型列表是静态还是账号相关？静态写 `config` 钩子；账号相关加 `provider.models` 钩子。
 2. **建包**：`package.json`（`"type": "module"`，入口 `index.mjs` 或 `index.ts`，keywords 含 `opencode`+`opencode-plugin`+`<厂商>`）+ 入口文件导出一个 async 函数。
-3. **实现钩子**（最小集）：`config`（声明供应商，用 `??=` 防覆盖用户配置）→ `auth`（methods + loader）→ 按需 `provider.models`、`auth.usage`、`auth.refresh`。
+3. **实现钩子**（最小集）：`config`（声明供应商，默认值在前+用户配置 spread 在后，补齐但不覆盖）→ `auth`（methods + loader）→ 按需 `provider.models`、`auth.usage`、`auth.refresh`。
 4. **沙箱测试**（绝不在日常 magpie 上测）：
 
    ```bash
@@ -46,11 +46,14 @@ const BASE = "https://api.acme.example/v1"
 export const AcmeAuthPlugin = async ({ client }) => ({
   config: async (cfg) => {
     cfg.provider ??= {}
-    cfg.provider[PROVIDER] ??= {          // ??= 防止覆盖用户在 plugins.json 的配置
+    // 默认值在前、用户已有配置在后：补齐缺省字段，但不覆盖用户改动
+    const was = cfg.provider[PROVIDER] ?? {}
+    cfg.provider[PROVIDER] = {
       name: "Acme",
       npm: "@ai-sdk/openai-compatible",   // 决定 fetch 收到的 API 格式
       api: BASE,
       models: { "acme-coder": { name: "Acme Coder", limit: { context: 200000, output: 32000 }, tool_call: true } },
+      ...was,
     }
   },
   auth: {
@@ -61,7 +64,11 @@ export const AcmeAuthPlugin = async ({ client }) => ({
       if (auth?.type !== "api") return {}
       return {
         baseURL: BASE,
+        apiKey: "opencode-acme-auth",     // 占位符！真 key 只进下面 fetch 的请求头（见「关键行为规则」）
         async fetch(input, init) {        // 每个请求都经过这里：签名、续期
+          // 宿主会把这个 fetch 交给其他插件调用：只允许发往厂商自己的域名
+          const url = new URL(String(input))
+          if (url.origin !== new URL(BASE).origin) throw new Error(`${PROVIDER}: 拒绝把 key 发往 ${url.origin}`)
           const headers = new Headers(init?.headers)
           headers.set("authorization", `Bearer ${auth.key}`)
           return fetch(input, { ...init, headers })
@@ -88,7 +95,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 
 | 钩子 | 归属 | 作用 | 关键约束 |
 |---|---|---|---|
-| `config(cfg)` | OpenCode | 声明供应商与默认模型 | 用 `cfg.provider ??=`，别覆盖用户配置 |
+| `config(cfg)` | OpenCode | 声明供应商与默认模型 | 默认值在前、用户配置 spread 在后：补齐缺省字段但不覆盖用户改动 |
 | `auth.methods` | OpenCode | 登录方式列表 | method 类型只有 `api`（key）和 `oauth`（url+callback，`method: "auto"` 自动完成 / `"code"` 用户粘贴）；method 上的 `prompts` 在登录前依次提问，问题类型 `text`/`select`/`password`（`password` 是 magpie 专属，OpenCode 只有前两种） |
 | `auth.loader(getAuth)` | OpenCode | 每账号一次，返回 `baseURL`/`apiKey`/`headers`/`fetch` | 登录信息变化后重新运行；每账号作用域，状态按 auth 存，不放供应商级模块变量 |
 | `provider.models(provider, {auth})` | OpenCode | 账号相关的模型列表 | 失败时返回 `provider.models` 或抛异常，magpie 保留原列表；登录失效抛 `{signIn: "expired"}` |
@@ -107,6 +114,9 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 - **改模型 id 流量记账**：模型可写 `free: true`（不占额度）、`rate`（点数倍率）。
 - **联网搜索透传**：转发 Anthropic/OpenAI 官方 API 时设 `searches: true`，客户端搜索请求原样到达你的 fetch。
 - **决策 API**：给提供商设 `decide: true` + 模型 `decides: true`，模型可作为路由分类器（`POST {baseURL}/systemone`）；标了 `decides` 的模型对智能体隐藏。
+- **真 key 的边界（安全红线）**：loader 返回的 `apiKey` 只放固定占位符——宿主会把 loader options 共享给其他插件的 `chat.headers` 钩子，且 apiKey 为空时宿主自动从登录存档填充，真 key 绝不出现在这里；真 key 只在 `fetch` 里按请求注入请求头。同理 loader 的 `fetch` 必须校验目标 URL origin 是厂商域名：宿主可能把它交给其他插件调用，防止 key 被带去任意外部地址。
+- **图标**：仓库根放 `icon.svg`（抓厂商官网 logo），`package.json` 的 `magpie.icon` 与各 `auth.icon` 用 `data:image/svg+xml;base64,…` 内嵌（不依赖外链，npm/GitHub 都能显示），icon.svg 加进 `files`。
+- **本地单测先行**：沙箱 CLI 测试前先用 `node --test` 单测模拟宿主调用每个钩子（config 不覆盖、请求头注入、非厂商域名拒绝、401 → `signIn: "expired"`），配 `npm test` + GitHub Actions（setup-node 跑 `node --test test/*.test.mjs`）。
 - **插件能看到的用户内容**：请求里的一切（对话、工具结果）。只发到用户要求的地方，不记日志。
 
 ## 其他插件形态（按需查全文档）
@@ -131,6 +141,8 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | token 过期反复登出 | 加 `auth.refresh`（refreshLead 默认 5 分钟）；OpenCode 兼容场景在 fetch 里保留续期检查 |
 | 401 误标登录失效 | 该 401 是别的问题时，fetch 返回头 `X-Magpie-Sign-In: kept` |
 | 模型列表拉取失败全丢 | models 钩子失败时返回 `provider.models` 原样兜底；登录失效抛 `{signIn: "expired"}` |
+| 其他插件能读到你的 API key | loader 的 `apiKey` 放了真 key：改固定占位符，真 key 只进 fetch 请求头 |
+| loader 的 fetch 把 key 发到别的域名 | 宿主会把它交给其他插件调用：fetch 里校验目标 origin 是厂商域名，不是就抛错 |
 | 中间件钩子不生效 | 检查运行环境限制（moejs：无 Node API；事件 50ms 超时）；`events` 导出只对有名字的事件 API 有效，Chat/Gemini 别写 |
 | 在应用里改了代码没生效 | 应用内把插件关掉再打开（终端命令每次都按当前内容加载） |
 | npm 发布后插件搜不到 | keywords 缺失：搜索查 `<关键词> opencode`，keywords 必须含 `opencode` + `auth`/`plugin`/`provider` 之一 |
@@ -156,10 +168,13 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | 10 | 在用户日常 magpie 上直接调试 | 用沙箱 HOME（`mktemp -d` + 独立 `XDG_*`） |
 | 11 | 状态存供应商级模块变量 | 多账号互相污染；按 auth 作用域存 |
 | 12 | 中间件里用 Node API / fetch / 定时器 | moejs 引擎不支持；依赖打进文件、相对导入 |
+| 13 | loader 的 `apiKey` 放真 key | 宿主共享给其他插件、空时自动从存档填充；放占位符，真 key 只进 fetch 请求头 |
+| 14 | loader 的 fetch 不校验目标域名 | 它会被宿主交给其他插件调用；origin 不是厂商域名就抛错 |
 
 ## 使用说明
 
 - 本 skill 是决策与骨架参考；钩子的完整字段、usage 返回结构、宿主协议、pi 细节查 [references/plugin-doc-full.md](references/plugin-doc-full.md) 对应章节。
 - 实现前先看社区同名或同厂商的插件（[magpie-community/plugins](https://github.com/magpie-community/plugins)）有没有现成登录逻辑可参考；社区仓库的 `bun scripts/check.mjs <name>` 可离线校验钩子。
+- **单文件全功能范例**：[egenchen/magpie-packycode](https://github.com/egenchen/magpie-packycode)——key 占位符、fetch 域名防护、config 合并、动态模型、usage 卡片、多 key 故障转移、node --test 单测 + CI，一个文件看全这些设计（书生端砚插件 ca-x/magpie-intern-ai 也照此结构）。
 - **Agent skill 形态的范例**：[magpie-quota](references/example-magpie-quota-skill.md) 是社区官方 skill（让 agent 查额度/等待恢复），展示了好的 skill 写法——frontmatter description 只写触发条件、命令+JSON 结构速查、"Don't" 黑名单收尾、明确 exit codes。给 magpie 生态写 skill（社区仓库 `skills/<name>/SKILL.md`）或写插件时可参照它的结构与克制。
 - 内容基于 magpie v0.1.676+ 文档（2026-10 抓取）；`auth.refresh` 需 v0.1.684+，`auth.checkin` 需 v0.1.1083+。
