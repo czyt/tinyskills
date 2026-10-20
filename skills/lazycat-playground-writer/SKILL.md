@@ -20,7 +20,14 @@ description: Use when writing or publishing an article (攻略) to the LazyCat P
 3. **脱敏**：截图前用 `eval` 改 DOM 文本再截图，比截图后修图可靠。已知敏感位：设备 ID（`.device-id`，保留前 4 位其余换成 `•`）、SendKey（input 改成 `SCT****`）、ntfy token、用户邮箱。
 4. **上传图片**：见下「图片自动上传」，核心是本地起 HTTP 服务 + ClipboardEvent 粘贴，平台自动传 COS 并把 markdown 图片链接插回编辑器。
 5. **写文章**：文章结构按信息依赖排序：开发动机 → 核心功能（每个功能先给场景再讲操作）→ 原理（深入浅出，不贴源码）→ 边界与坑。功能清单式说明书是失败模式，每个功能必须先有「为什么需要它」的场景。
-6. **填表发布**：`https://lazycat.cloud/playground/workshop` 填标题和正文，封面和分类让用户手动完成（cover 有独立上传组件，eval 不可靠）。🔴 CHECKPOINT：用户点发布后，确认 URL 变成 `playground/publish-finished?type=图文` 才算成功，然后关闭本地 HTTP 服务再收尾。
+6. **AI 味审校**：初稿完成后、填表发布前执行。按 [references/humanize-rules.md](references/humanize-rules.md) 的 17 类模式扫描（提炼自 [humanize-text-skill](https://github.com/lynote-ai/humanize-text-skill)）：
+
+   **执行顺序**：①先围栏保护跨度——数字、命令、路径、版本号、配置键名、脱敏占位（`SCT****`）永不改写；②按 17 类模式逐段检查，点名每处命中的类别；③用最小有效修改重写（能改一句不重排一段），不虚构事实/来源/情绪；④二遍残留检查——专门找改写过程中新引入的套话。
+
+   🔴 **CHECKPOINT：** 审校前向用户确认语气取向（默认：像用过这个应用的人在分享，允许第一人称真实使用痕迹）。审校后对照 humanize-rules 的「人味标准」四条自检：第一人称使用痕迹、界面上下文、具体坑、适度口语——不达标再过一遍，达标才进入填表发布。
+
+   攻略初稿最常命中的五类：机械分点的功能清单（对应写作步骤 5 的失败模式）、意义拔高（"极大提升了效率"）、总结收尾段、聊天机器人残留（"希望这篇攻略对你有帮助"）、节奏过于均匀。命中即改，用具体使用细节替换。
+7. **填表发布**：`https://lazycat.cloud/playground/workshop` 填标题和正文，封面和分类让用户手动完成（cover 有独立上传组件，eval 不可靠）。🔴 CHECKPOINT：用户点发布后，确认 URL 变成 `playground/publish-finished?type=图文` 才算成功，然后关闭本地 HTTP 服务再收尾。
 
 ## 图片自动上传（关键技巧）
 
@@ -75,6 +82,8 @@ window.__pasteOne = async (name) => {
 | OCR / image.read 不可用 | 本机 modality provider 未配置 | 靠 snapshot + eval 读 DOM 文本，这是常态，不要反复重试 OCR |
 | 全页截图 fullPage 报不支持 | 桌面 webview 限制 | 用 scroll + 多次 viewport 截图拼接 |
 | eval 中中文被截断或转义出错 | 长文本直接写进 eval 表达式 | 把 markdown 存本地文件放 HTTP 目录，eval fetch 回来再 setValue |
+| 审校把技术内容改"口语"了（键名/命令被改写） | 审校时保护跨度没先围栏 | 重跑审校：先列出保护跨度清单再动笔；被改坏的技术锚点按原文恢复 |
+| 审校后文章反而更空（细节被当套话删了） | 最小有效修改原则没执行——重写了整段 | 回退该段，只点名删一类模式；不确定是否套话的句子保留 |
 
 ## 不要做
 
@@ -82,7 +91,9 @@ window.__pasteOne = async (name) => {
 - 不要替用户输入任何密码或验证码；登录只让用户在共享浏览器完成
 - 不要在文章里贴源码；原理用自然语言讲（比如 RTC 闹钟写后回读比对再关机）
 - 不要在登录页面上传截图：先确认已进入应用主界面
-- 不要用绝对时间「今天/刚刚」描述应用行为，写清楚功能语义
+- 不要用绝对时间「今天/刚刚」描述应用行为，写清楚功能语义——**AI 味审校时同样遵守**，不要为了口语化引入绝对时间
+- 不要为了去 AI 味改写技术锚点：配置键名、命令、报错原文、脱敏占位（`SCT****`）不是 AI 腔，是事实
+- 不要用"写得更华丽"来去 AI 味；方向是具体、平实、有真实使用痕迹，不是堆修辞
 
 ## 已知平台事实
 
