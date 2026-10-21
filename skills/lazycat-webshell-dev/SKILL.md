@@ -69,7 +69,7 @@ resource_exports:
 | Build your own runtime | Full implementation spec (types, OCI bundle, overlay, nsenter, yamux, network, stats, error matrix, step order, effort table): [self-hosted-runtime.md](references/self-hosted-runtime.md) |
 | Distro differences | apt/pacman/ubuntu handling runs **inside** the instance, not as host chroot: [distro-adaptation.md](references/distro-adaptation.md) |
 | Instance lifecycle | rootfs → create files → runc start → firstboot → autostart → user → preinstalls → SSH → stop/delete: [instance-lifecycle.md](references/instance-lifecycle.md) |
-| SSH (two layers) | Guest `sshd` (`enable_ssh`/`ssh_port`) is separate from host forwarding (`ssh_forward_*`); container instances have **no** separate SSH password: [instance-lifecycle.md §8](references/instance-lifecycle.md) |
+| SSH (two layers) | Guest `sshd` (`enable_ssh`/`ssh_port`) is separate from host forwarding (`ssh_forward_*`); container instances have **no** separate SSH credential: [instance-lifecycle.md §8](references/instance-lifecycle.md) |
 | Pick your dimension | Provider / instance agent / self-hosted runtime / UI-only / rootfs — cross matrix and doc map: [dev-dimensions.md](references/dev-dimensions.md) |
 
 ## Workflow
