@@ -146,6 +146,31 @@ POST /api/exec-stream/{session_id}/pty-control
 
 ---
 
+## 4.5 真实实例的 bind_mounts（线上样本）
+
+线上 xcoder（`security_level=system`、`network_mode=host`、`vt=true`）的 `/api/list` 输出里，
+`bind_mounts` 不是用户手填的，而是 lightos-admin 创建时写入的固定挂载：
+
+| source_path | target_path | 说明 |
+| --- | --- | --- |
+| `/lzcapp/run/catlink` | `/run/catlink` | 显示/输入/音频桥 |
+| `/lzcapp/document/<user>` | `/lzcapp/document` | 用户文稿，`owner: "1000:1000"` |
+| `/lzcapp/run/resources/skills` | 同路径 | 只读 |
+| `/lzcapp/run/lightos-skill-hub/<hash>/<hash>` | `/run/lightos-skill-hub` | 只读 |
+| `/lzcapp/pkg/content/skill-hub/AGENT.md` | `/opt/lightos-skill-hub/AGENT.md` | 只读单文件挂载 |
+| `…/mcp-providers` | `/lzcapp/run/resources/mcp-providers` | 只读 |
+
+可见 `bind_mounts` 支持**单文件挂载**（target 是文件路径），不只有目录。
+自研内核时按 `mount --bind` 逐条处理即可，`read_only` 为 true 时加 `MS_RDONLY`。
+
+rootfs 落在 per-user scope 下：
+
+```
+/lzcapp/var/lightos/users/<uid>/scopes/<base64(deploy_id)>/managed/<instance>/rootfs
+```
+
+---
+
 ## 5. 实例对象（`/api/list` / `/api/instances/{n}`）
 
 ```json
@@ -273,6 +298,27 @@ sandbox → sysbox-runc（/sys 为 sysboxfs）
 system  → runc
 nat 网络 → 100.64.0.x/24，网关/DNS 100.64.0.1
 ```
+
+---
+
+## 9.5 资源发现位置（LPK 容器内）
+
+平台把已安装应用的资源**解到 `/lzcapp/run/resources/`**，lightos-admin 从这里读 provider：
+
+```
+/lzcapp/run/resources/lightos.webshell/<pkg-id>/<name>/webshell-provider.json
+/lzcapp/run/resources/mcp-providers/<pkg-id>/<name>/mcp.yml
+/lzcapp/run/resources/skills/<pkg-id>/<skill>/SKILL.md
+```
+
+实测：
+
+```
+cloud.lazycat.lightos.entry  → {"support_home": true,  "root_path": "/webshell/"}
+cloud.czyt.webshell.demo     → {"support_home": false, "root_path": "/"}
+```
+
+所以 provider 没出现在列表时，直接看这个目录有没有你的 pkg-id 就能定位是"没导出"还是"没安装"。
 
 ---
 

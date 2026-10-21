@@ -37,6 +37,26 @@ HOME=/root
 
 ---
 
+### 线上 system 级实例（`security_level=system`）的对照
+
+同样在 tinycat 上、`system` 级别、Arch 的实例 `xcoder`：
+
+```
+/etc/os-release     Arch Linux (rolling)
+systemd             262
+/proc/1/status      CapInh 0000000000000000
+                    CapPrm/CapEff/CapBnd 000001fffbffffff
+                    NoNewPrivs 0, Seccomp 2（有过滤器）
+mountinfo           30 条
+/lzcapp             document/ run/ —— 由 bind_mounts 挂进来的，不是镜像自带
+/lzcinit            不存在
+```
+
+和 sandbox 实例的区别只有：无自定义 user namespace（`container=systemd` 而不是 `private-users`）、
+能力集少 2 位（`1fffbffffff` vs `1ffffffffff`）。
+
+---
+
 ## 3. 那平台“注入”了什么
 
 不是文件，而是**运行时边界**：
@@ -138,3 +158,4 @@ lightosctl exec -ti g1 /bin/sh
 | "平台会往实例注入环境变量" | 只注入 `container=private-users`/`HOME`/`PATH` 这几个常量 |
 | "rootfs 必须是 Arch" | 不是；要求是 systemd + `/sbin/init`，Debian/Ubuntu 同样可以 |
 | "实例里能调平台 gRPC" | 不能；`/lzcapp/run/sys/lzc-apis.socket` 只在 LPK 容器里 |
+| "/lzcapp 是实例镜像的一部分" | 不是；它是 lightos-admin 创建实例时用 `bind_mounts` 挂进来的（catlink、document、skills） |
