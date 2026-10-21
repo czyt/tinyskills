@@ -400,31 +400,31 @@ detect_ssh_port() {
 }
 ```
 
-### 8.2 密码：与系统登录密码**相互独立**
+### 8.2 密码：容器实例与物理机实例不一样
 
-UI 文案原文："默认关闭，密码独立于系统/微服登录密码；修改会关闭已有 SSH，不关闭浏览器终端。"
-"新密码非空即可；留空沿用当前密码。"
+**容器实例（`lightos.manage` 这一层）**：SSH 没有独立密码字段。
+`sshd_config.d/lightos-lpk.conf` 只开了 `PasswordAuthentication yes`，
+登录凭据就是**实例内 Linux 用户的密码**，也就是首启时 `seed.env` 里的 `LIGHTOS_PASSWORD`。
+实测证据：`create` 的 payload 只有 `username`；`lpk-ssh.env` 只有 `ENABLE/PORT/NETWORK_MODE`；
+整个 `lightos-admin` 里 `chpasswd` 只出现一次，就在首启脚本里。
 
-实测行为：
+**物理机实例（PC 客户端那一层）**：有独立的 SSH 密码，界面文案是
+"密码独立于系统/微服登录密码；修改会关闭已有 SSH，不关闭浏览器终端"。
+那一层走 `client-instances/ssh` 接口，与容器实例的 `enable_ssh` 不是同一套。
 
-- `create` 只带 `username`，**不带密码**
-- 首次开启 SSH 时如果没有独立 SSH 密码，提示 `set an independent SSH password first`
-- 密码只存在于请求内存，不写浏览器存储
-- 变更密码会**先停 sshd**，再设新密码、再启动（`SSH password processing busy` 是并发保护）
+> 容易混的点：容器实例改 SSH 密码 = 改 Linux 用户密码，会同时影响 `exec` 以外的登录方式；
+> 物理机实例的独立密码不影响任何系统账号。
 
-自研时最小实现：
+自研容器运行时，最小实现就是：
 
 ```sh
-# 宿主侧：把明文经 stdin 传给实例，不要进 argv / 日志
-printf '%s\n' "$SSH_PASSWORD" | nsenter -t "$PID" -m -p -- \
-  sh -c 'chpasswd -c SHA512'   # 或用 usermod -p "$(openssl passwd -6 ...)"
+# 首启时（一次性）
+echo "${username}:${LIGHTOS_PASSWORD}" | chpasswd -c SHA512
 
-# 设完立刻停用旧会话，避免旧凭据继续可用
-nsenter -t "$PID" -m -p -- systemctl restart "$(ssh_svc)"
+# 运行期改密码：经 stdin 传入，不进 argv / 日志
+printf '%s\n' "$NEW_PASSWORD" | nsenter -t "$PID" -m -p -- chpasswd -c SHA512
+nsenter -t "$PID" -m -p -- systemctl restart "$(ssh_svc)"   # 旧凭据立即失效
 ```
-
-> 别把 SSH 密码塞进 `/etc/lightos/seed.env`：那个文件是**首启系统用户**用的，
-> 首启结束就被删；SSH 密码是**运行期可改**的独立凭据。
 
 ### 8.3 宿主侧转发：字段与校验
 
