@@ -65,6 +65,7 @@ resource_exports:
 | LightOS commands | Use `ps`, `system admin-info --json`, `exec`, optional `forward`, and public admin APIs for Publish/Catlink |
 | Core contract | Direct `/api/*` or yamux stream work: [lightosctl-core-contract.md](references/lightosctl-core-contract.md) — 17 endpoints, create fields, stream names, resize path |
 | Instance contents | What the platform puts **inside** an instance (answer: nothing): [instance-runtime-injection.md](references/instance-runtime-injection.md) |
+| No LightOS dependency | Plain LPK / self-built runtime / lightos, pick one: [lightosctl-core-contract.md §11](references/lightosctl-core-contract.md) |
 
 ## Workflow
 
@@ -222,6 +223,9 @@ Provider 在异构 LazyCat 环境中运行，以下边界情况须覆盖，避�
 - 不要在 `sandbox` 级别实例里期待宿主机能力（`/sys` 是 sysboxfs 伪装）。
 - 不要往 rootfs 里放 `lightosctl` 或 `/lzcinit`：实例内没有这些文件，`exec` 是宿主机侧 `nsenter` 进去的。
 - 不要用 `chroot` 解释 LightOS 实例：`sandbox=sysbox-runc`、`system=runc`。
+- 不要把 `lzc-apis` 的 gRPC 当成 LightOS 私有能力：它是平台公开给所有 LPK 的（按 `package.yml` 权限授予），LightOS 只是使用者。
+- 不要在方案里声称"复用 LightOS 就绕过了平台限制"：实例元数据、`lightos.*` 权限、`/lzcinit` 注入都来自平台。
+- 不要把"做实例运行时"当成首选：普通 LPK 零特权即可上线；只有需要 runc 级控制时才要宿主机特权。
 
 ## What Not To Copy Blindly
 

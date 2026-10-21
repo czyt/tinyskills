@@ -5,6 +5,14 @@
 
 ---
 
+## 0. 属于哪一层
+
+实例是 **LightOS 应用层**的产物（runc/sysbox-runc + overlay + bind mount），不是平台 gRPC 能力。
+平台 gRPC（`lzc-apis.socket`）负责盒子级能力，从不接触实例内部；两层的区分见
+[lightosctl-core-contract.md §0](lightosctl-core-contract.md#0-两层能力先分清)。
+
+---
+
 ## 1. 一句话结论
 
 **实例里没有任何 lightosctl。** 它是 provider 侧（LPK 容器）的工具，`lightosctl exec` 只是从外部把命令送进去。

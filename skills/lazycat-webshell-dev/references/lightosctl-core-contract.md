@@ -5,6 +5,33 @@
 
 ---
 
+## 0. 两层能力，先分清
+
+**先分清"平台"和"应用"是两回事**：LPK 是平台上的应用，可以不依赖 LightOS。
+只有需要"持久 Linux 实例"时，才在下面两层中选择。
+
+| 你想做的 | 依赖 LightOS 应用 | 依赖平台 gRPC | 需要宿主机特权 |
+| --- | --- | --- | --- |
+| 普通 LPK（Web 服务/工具/数据库） | ❌ | 可选 | ❌ |
+| 自研实例运行时（LightOS 替代品） | ❌ | 可选 | ✅ runc/sysbox |
+| 使用现成实例（WebShell provider） | ✅ | 需要 `lightos.manage` | ❌ |
+
+LightOS 横跨两个完全不同的能力层，自研边界就在这里：
+
+| 层 | 传输 | 归属 | 能否自研 |
+| --- | --- | --- | --- |
+| 平台 API | gRPC over `unix:///lzcapp/run/sys/lzc-apis.socket`，mTLS（`app.crt`/`app.key`/`box.crt`） | 懒猫平台，绑定盒子硬件与 app 身份 | ❌ 不需要、也拿不走 |
+| LightOS 运行时 | HTTP/JSON + yamux over `unix:///lzcapp/run/sys/lightos-core.sock` | LightOS 应用自己实现 | ✅ 可复刻（本文就是它的规格） |
+
+平台 API 覆盖：`BoxService`（硬件/关机/时区）、`PackageManager`（装/卸/查应用）、`FileHandler`（文件）、
+`PeripheralDeviceService`（磁盘/文稿挂载）、`TvOS`（云桌面）、`localdevice.RemoteControl`。
+这些是**公开给所有 LPK 的能力**，按 `package.yml` 声明权限即可用，不属于 LightOS 私有。
+
+`lightos.*` 权限（`lightos.use` = 只管自己的实例；`lightos.manage` = 可管全局并创建超级权限实例）同样是平台授予的，
+所以自研 LightOS **不是绕过平台**，而是替换跑在平台上的这一层应用。
+
+---
+
 ## 1. 传输与身份
 
 ```
@@ -329,3 +356,84 @@ provider 只用得到 §2 里的 `ps`、`system admin-info`、`exec`、`exec -i/
 `/unsafe_api/webshell/*`、`/unsafe_api/publish/*`。
 
 自研内核时，实现 §2 全部端点 + §4 的 yamux 命名流即可让现有 UI 与所有 provider 原样运行。
+
+---
+
+## 11. 不依赖 LightOS：自研实例运行时的做法
+
+平台不要求 LPK 依赖 LightOS。要自己做"实例"这一层，有三条路，按需要选：
+
+### 11.1 只有普通 LPK（零特权）
+
+```yaml
+# package.yml
+package: cloud.czyt.myapp
+version: 0.1.0
+name: MyApp
+min_os_version: v1.5.2
+permissions:
+  required: []          # 不需要 lightos.*
+locales:
+  zh: { name: MyApp }
+```
+
+```yaml
+# lzc-manifest.yml
+application:
+  subdomain: myapp
+  routes:
+    - /=http://127.0.0.1:8080
+services:
+  app:
+    image: registry.lazycat.cloud/xxx/myapp:1.0.0
+```
+
+能拿到的平台能力：路由/域名、登录、多用户、`/lzcapp/var` 持久卷、`/lzcapp/run/sys/lzc-apis.socket` 的 gRPC。
+拿不到的：任何"持久 Linux 实例"、`runc`、宿主机网络。
+
+### 11.2 自研实例运行时（替代 LightOS）
+
+前提：需要宿主机特权，普通 LPK 容器做不到。
+
+| 手段 | 代价 |
+| --- | --- |
+| `compose_override` 挂宿主 socket / 设备 | 文档明示"风险接近最高权限" |
+| `run_as` + `network_mode: host` + `device.block` | 仍需在目标机验证 |
+| 依赖宿主已有的 `runc` / `sysbox-runc` | 需自行确认存在性（LightOS 的 `cde` 镜像带） |
+
+最小内核要实现的，就是本文 §2 + §4 的接口：
+
+```
+unix:///lzcapp/run/sys/<your-core>.sock
+  GET  /api/list | /api/instances/{n} | /api/capabilities …
+  POST /api/create | /api/start | /api/stop | /api/delete
+  POST /api/instances/{n}/exec-stream   → yamux(control/exec-stdin/exec-stdout/exec-stderr/exec-pty)
+```
+
+实例本身 = `overlay(lowerdir=source_dirs+rootfs, upperdir/workdir)` + `runc/sysbox-runc run` + `nsenter` 进 pid 执行。
+`create` 的字段可以完全照抄本文 §3，这样任何现成的 `lightos.webshell` provider 都能接你的运行时。
+
+### 11.3 想被 `lightos-admin` 发现
+
+导出资源即可，不要求你的运行时和 LightOS 相同：
+
+```yaml
+# lzc-build.yml
+resource_exports:
+  - kind: lightos.webshell
+    source: ./resources/lightos.webshell
+```
+
+```json
+// resources/lightos.webshell/default/webshell-provider.json
+{ "support_home": false, "root_path": "/" }
+```
+
+平台把它解到 `/lzcapp/run/resources/lightos.webshell/<pkg-id>/<name>/`，`lightos-admin` 从这里读取并打开
+`https://<provider>/<?name=<name>@<owner_deploy_id>>`。这条**资源导出契约是平台公开的**，与 LightOS 实现无关。
+
+### 11.4 选择建议
+
+1. 先做普通 LPK（11.1），验证产品形态；这一步零依赖、可直接上架。
+2. 需要持久环境且能接受"用户装 LightOS"→ 走 `lightos.manage` + `lightosctl`（成本最低）。
+3. 只有需要自定义 cgroup/快照/GPU 分配时才做 11.2，并优先复用 §3/§4 的字段与流名，保持生态兼容。
