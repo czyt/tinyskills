@@ -78,6 +78,10 @@ resource_exports:
 
 ### Phase 2: LPK 元数据生成
 
+**输入**：Phase 1 选定的分类 + 目标运行时。
+**产出**：`package.yml` / `lzc-build.yml` / `lzc-manifest.yml` / `webshell-provider.json` 四个文件。
+**完成判据**：`lzc-cli project lint` 无告警，且 `root_path` 与 route 前缀一致。
+
 2. Generate or review LPK metadata:
    - `package.yml`: declare display metadata and `permissions.required: [lightos.manage]`. Use `hidden_from_launcher: true` only for provider-only apps; omit it when the app can open standalone by selecting a default running instance.
    - `lzc-build.yml`: must export `kind: lightos.webshell` from `./resources/lightos.webshell`.
@@ -89,6 +93,10 @@ resource_exports:
 
 ### Phase 3: Provider 入口合约
 
+**输入**：Phase 2 的四个文件。
+**产出**：可打开的入口页 + `/api/instances` + 同页返回。
+**完成判据**：带 `?name=` 打开能直连实例；不带 `?name=` 能选实例并回写 URL；返回按钮落在 LightOS 首页。
+
 3. Implement the provider entry contract:
    - lightos-admin opens `https://<provider-domain><root_path>?name=<name>@<owner_deploy_id>`.
    - Validate `name` before using it; require exactly the `<name>@<owner_deploy_id>` selector shape and never drop `owner_deploy_id`.
@@ -99,6 +107,11 @@ resource_exports:
    > ⏸️ **Checkpoint 3**: 验证入口 URL 可达、`?name=` 参数解析正确、账号隔离生效、同页返回 LightOS 首页可用。
 
 ### Phase 4: 终端桥接、会话保持与多端一致性
+
+**输入**：Phase 3 的 selector 校验与实例列表。
+**产出**：PTY 桥 + `state/action/activity/attach` 四个端点 + 有界历史。
+**完成判据**：刷新后 pane 恢复、双端输出一致、回放完成前拒收输入。
+**建议取值**：单 pane 历史 2 MB、输入队列 64 KB、重连退避 1s→2s→4s（上限 30s）、回放窗口 256 KB/帧。
 
 4. Build the terminal bridge and session model:
    - For direct shell access, start `/lzcinit/lightosctl exec -ti selector /bin/sh -lc <bootstrap>` under a PTY or equivalent terminal process abstraction.
@@ -121,6 +134,10 @@ resource_exports:
 
 ### Phase 5: 移动端体验
 
+**输入**：Phase 4 可用的桌面终端。
+**产出**：触屏快捷键条、IME 安全输入、visual viewport 布局。
+**完成判据**：软键盘不遮挡、中文不重发、横竖屏后 cols/rows 正确。
+
 5. Make the browser terminal usable on touch devices:
    - Layout: viewport-fit, safe-area insets, `dvh` or visual viewport variables, and provider-owned navigation if platform chrome is hidden.
    - Input: touch shortcuts for Tab/Return/arrows/Esc/modifiers/copy/paste/search/tab actions; no hover, right-click, or hardware-keyboard dependency.
@@ -132,6 +149,10 @@ resource_exports:
    > ⏸️ **Checkpoint 5**: 在手机浏览器验证软键盘、中文输入、快捷键、选择复制、横竖屏、返回键、离线重连。
 
 ### Phase 6: 可选平台 API 集成
+
+**输入**：Phase 3/4 已跑通的 provider。
+**产出**：Catlink 状态展示、Publish 服务管理（仅在需要时）。
+**完成判据**：`checkpoint 6` 三件事都能在 lightos-admin 里看到结果。
 
 6. Integrate optional platform APIs:
    - Resolve lightos-admin with `/lzcinit/lightosctl system admin-info --json`; do not ask the frontend to guess the admin domain.
@@ -181,6 +202,19 @@ Provider 在异构 LazyCat 环境中运行，以下边界情况须覆盖，避�
 | **PTY resize 无效** | resize 走 `POST /api/exec-stream/{session_id}/pty-control`，路径是 session uuid 而非实例名 |
 
 传输协议偏好：**WebSocket**（默认） > **gRPC-stream**（需要 gRPC-Web proxy）> **connect-rpc**（HTTP/1.1 fallback 友好）。SSE+POST 仅用于日志流等单向推送场景，不适合交互式终端。
+
+## Do Not (集中禁令)
+
+- 不要在浏览器里拼接 admin 域名或 `lightos-admin` 路径；只用 `lightosctl system admin-info --json` 的结果。
+- 不要让前端生成或改写 selector；selector 只来自 `/lzcinit/lightosctl ps`。
+- 不要在 provider 里直接调 lightos-core 的 `/api/*`：那需要宿主机 socket；第三方 provider 走 `lightosctl` 与 `/unsafe_api/*`。
+- 不要把工作区内 UI 动作（新建/关闭/改名 tab）当成终端输入写进 PTY。
+- 不要为同一个 pane 起多个 PTY；一个 pane 只有一个字节源。
+- 不要在 history replay 完成前接受输入，也不要让第二台设备回写生成的终端响应。
+- 不要默认镜像里有 `bash`、`sudo`、`tmux`、`zellij`：先用 `command -v` 探测。
+- 不要把 `lightosctl exec` 的退出码当作命令退出码：它只反映 HTTP 结果。
+- 不要在 `sandbox` 级别实例里期待宿主机能力（`/sys` 是 sysboxfs 伪装）。
+- 不要用 `chroot` 解释 LightOS 实例：`sandbox=sysbox-runc`、`system=runc`。
 
 ## What Not To Copy Blindly
 
