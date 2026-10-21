@@ -551,6 +551,40 @@ UI 直接调你的 core（同一个容器内 unix socket），不需要经过 `l
 
 ---
 
+## 11.5 各模块工作量与「该不该自己写」
+
+| 模块 | 现状提供方 | 自研后 | 量级 |
+| --- | --- | --- | --- |
+| 登录 / 路由 / 证书 / 多用户 | 平台 | 平台（不变） | 0 |
+| 应用安装 / 卸载 / 查询 | 平台 `PackageManager` | 平台（不变） | 0 |
+| 文件读 / 写 / tar / stat | 平台 `FileHandler` | 平台（不变） | 0 |
+| 硬件 / 关机 / 时区 | 平台 `BoxService` | 平台（不变） | 0 |
+| 用户 / 成员 / 权限 | 平台 `userManager` | 平台（不变） | 0 |
+| rootfs 生成 | LightOS（`docker build + export`） | 复用 Docker CLI | ~100 行 |
+| 实例生命周期 | LightOS（overlay + runc） | **自写** | ~600 行 |
+| exec / PTY（yamux） | LightOS | **自写** | ~600 行 |
+| tcp / forward -R | LightOS | **自写** | ~400 行 |
+| nat 网络 | LightOS | **自写** | ~300 行 |
+| 统计（cgroup v2） | LightOS | **自写** | ~150 行 |
+| 管理 UI | LightOS | 自写（或不用） | 视需求 |
+| WebShell 终端 | `lcmd-webshell` 可复用 | 复用 | 0 |
+| 发行版差异（apt/pacman/ubuntu） | LightOS 用 shell 判断 | 抄脚本即可 | ~50 行，见 [distro-adaptation.md](distro-adaptation.md) |
+
+**结论**：要"自己的实例"，必须写的是 rootfs + 生命周期 + exec + 网络 + 统计，
+后端约 2000–2500 行；其余（登录、应用、文件、硬件、用户）全部白拿。
+
+想少写的话有两条退路：
+
+| 做法 | 省掉 | 代价 |
+| --- | --- | --- |
+| 只用 LightOS 实例，自己写 UI | 上面所有「自写」 | 用户必须装 LightOS |
+| 用 `lightosctl` 当 SDK，只做界面 | 只写 UI | 同上 |
+
+最小可交付（能跑通创建→执行→删除）：**约 800 行**，只做 list/instances/create/start/delete +
+`docker export` 出 rootfs + runc（system）+ 非 PTY `nsenter`。
+
+---
+
 ## 12. 从这里开始（推荐默认路径）
 
 不要先纠结选项，按下面这条路径做，一路都能跑，后面可升级：

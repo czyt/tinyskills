@@ -66,7 +66,8 @@ resource_exports:
 | Core contract | Direct `/api/*` or yamux stream work: [lightosctl-core-contract.md](references/lightosctl-core-contract.md) — 17 endpoints, create fields, stream names, resize path |
 | Instance contents | What the platform puts **inside** an instance (answer: nothing): [instance-runtime-injection.md](references/instance-runtime-injection.md) |
 | No LightOS dependency | Plain LPK / self-built runtime / lightos, pick one: [lightosctl-core-contract.md §11](references/lightosctl-core-contract.md) |
-| Build your own runtime | Full implementation spec (types, OCI bundle, overlay, nsenter, yamux, network, stats, error matrix, step order): [self-hosted-runtime.md](references/self-hosted-runtime.md) |
+| Build your own runtime | Full implementation spec (types, OCI bundle, overlay, nsenter, yamux, network, stats, error matrix, step order, effort table): [self-hosted-runtime.md](references/self-hosted-runtime.md) |
+| Distro differences | apt/pacman/ubuntu handling runs **inside** the instance, not as host chroot: [distro-adaptation.md](references/distro-adaptation.md) |
 
 ## Workflow
 
@@ -228,6 +229,8 @@ Provider 在异构 LazyCat 环境中运行，以下边界情况须覆盖，避�
 - 不要在方案里声称"复用 LightOS 就绕过了平台限制"：实例元数据、`lightos.*` 权限、`/lzcinit` 注入都来自平台。
 - 不要把"做实例运行时"当成首选：普通 LPK 零特权即可上线；只有需要 runc 级控制时才要宿主机特权。
 - 不要在没跑过 `lightosctl` 回归前就接 UI：先用原版 CLI 逐条对齐错误矩阵，再让界面进来。
+- 不要把发行版适配写成宿主机 chroot 逻辑：平台没有这个能力，LightOS 也是在实例内用 `command -v apt-get/pacman` 与 `/etc/os-release` 判断。
+- 不要为"登录/应用安装/文件/硬件/用户"重写实现：那些是平台 gRPC，白拿。
 
 ## What Not To Copy Blindly
 

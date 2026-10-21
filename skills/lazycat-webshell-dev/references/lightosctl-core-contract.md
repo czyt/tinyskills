@@ -18,10 +18,13 @@
 
 LightOS 横跨两个完全不同的能力层，自研边界就在这里：
 
-| 层 | 传输 | 归属 | 能否自研 |
-| --- | --- | --- | --- |
-| 平台 API | gRPC over `unix:///lzcapp/run/sys/lzc-apis.socket`，mTLS（`app.crt`/`app.key`/`box.crt`） | 懒猫平台，绑定盒子硬件与 app 身份 | ❌ 不需要、也拿不走 |
-| LightOS 运行时 | HTTP/JSON + yamux over `unix:///lzcapp/run/sys/lightos-core.sock` | LightOS 应用自己实现 | ✅ 可复刻（本文就是它的规格） |
+| 层 | 传输 | 归属 | 能否自研 | 具体内容 |
+| --- | --- | --- | --- | --- |
+| 平台 API | gRPC over `unix:///lzcapp/run/sys/lzc-apis.socket`，mTLS（`app.crt`/`app.key`/`box.crt`） | 懒猫平台，绑定盒子硬件与 app 身份 | ❌ 白拿 | 登录/路由/证书、应用安装、文件、硬件、用户 |
+| LightOS 运行时 | HTTP/JSON + yamux over `unix:///lzcapp/run/sys/lightos-core.sock` | LightOS 应用自己实现 | ✅ 可复刻（本文是它的规格） | 实例生命周期、exec/PTY、tcp/forward、网络、统计 |
+
+**没有第三层**：不存在"平台的 chroot / rootfs 服务"。LightOS 的 rootfs 由 `docker build + export` 产生，
+发行版差异是在实例内部用 `command -v apt-get/pacman` 判断的，详见 [distro-adaptation.md](distro-adaptation.md)。
 
 平台 API 覆盖：`BoxService`（硬件/关机/时区）、`PackageManager`（装/卸/查应用）、`FileHandler`（文件）、
 `PeripheralDeviceService`（磁盘/文稿挂载）、`TvOS`（云桌面）、`localdevice.RemoteControl`。
