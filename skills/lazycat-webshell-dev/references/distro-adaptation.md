@@ -124,7 +124,7 @@ getent group audio >/dev/null 2>&1 && usermod -aG audio "${username}"
 
 # 4. 密码与 sudoers
 [ -f /etc/login.defs ] && sed -i 's/^ENCRYPT_METHOD.*/ENCRYPT_METHOD SHA512/' /etc/login.defs
-[ -n "$password" ] && echo "${username}:${password}" | chpasswd -c SHA512
+[ -n "${LIGHTOS_PASSWORD}" ] && echo "${username}:${LIGHTOS_PASSWORD}" | chpasswd -c SHA512
 mkdir -p /etc/sudoers.d
 printf '%s\n' '%wheel ALL=(ALL:ALL) ALL' '%sudo ALL=(ALL:ALL) ALL' > /etc/sudoers.d/90-lightos
 chmod 0440 /etc/sudoers.d/90-lightos

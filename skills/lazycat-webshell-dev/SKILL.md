@@ -68,7 +68,9 @@ resource_exports:
 | No LightOS dependency | Plain LPK / self-built runtime / lightos, pick one: [lightosctl-core-contract.md §11](references/lightosctl-core-contract.md) |
 | Build your own runtime | Full implementation spec (types, OCI bundle, overlay, nsenter, yamux, network, stats, error matrix, step order, effort table): [self-hosted-runtime.md](references/self-hosted-runtime.md) |
 | Distro differences | apt/pacman/ubuntu handling runs **inside** the instance, not as host chroot: [distro-adaptation.md](references/distro-adaptation.md) |
-| Instance lifecycle | rootfs → create files → runc start → firstboot → autostart → user/password → preinstalls → stop/delete: [instance-lifecycle.md](references/instance-lifecycle.md) |
+| Instance lifecycle | rootfs → create files → runc start → firstboot → autostart → user → preinstalls → SSH → stop/delete: [instance-lifecycle.md](references/instance-lifecycle.md) |
+| SSH (two layers) | Guest `sshd` (`enable_ssh`/`ssh_port`, own password) is separate from host forwarding (`ssh_forward_*`): [instance-lifecycle.md §8](references/instance-lifecycle.md) |
+| Pick your dimension | Provider / instance agent / self-hosted runtime / UI-only / rootfs — cross matrix and doc map: [dev-dimensions.md](references/dev-dimensions.md) |
 
 ## Workflow
 
@@ -234,6 +236,9 @@ Provider 在异构 LazyCat 环境中运行，以下边界情况须覆盖，避�
 - 不要为"登录/应用安装/文件/硬件/用户"重写实现：那些是平台 gRPC，白拿。
 - 不要把开机自启做成实例内的 `systemctl enable`：auto-start 由 core 启动时重放 `status==running` 决定。
 - 不要在实例里留存明文密码：`/etc/lightos/seed.env` 必须在 firstboot 结束时删除。
+- 不要把"实例内 sshd"和"宿主侧 SSH 转发"当一个开关：前者是 `enable_ssh`，后者是 `ssh_forward_*`；关 sshd 必须连带关转发。
+- 不要用 `systemctl is-active` 判断 SSH 就绪：要用 `ssh-keyscan` 实际探活。
+- 不要把 SSH 密码写进 `seed.env`：那是首启系统用户的一次性载体，SSH 密码是运行期可改的独立凭据。
 
 ## What Not To Copy Blindly
 

@@ -15,7 +15,8 @@
 ⑤ 开机自启           由调用方保证（runtime 重启后重新 start）   （§5）
 ⑥ 用户名/密码        seed.env → firstboot 脚本                 （§6）
 ⑦ 预装软件           LIGHTOS_PKG_* → apt/pacman/npm            （§7）
-⑧ 停止/删除          SIGTERM → runc delete → 删目录            （§8）
+⑧ SSH                实例内 sshd + 宿主转发，两个独立开关       （§8）
+⑨ 停止/删除          SIGTERM → runc delete → 删目录            （§9）
 ```
 
 **关键认知**：所有"进入 rootfs 做事"的动作都发生在**已启动的实例内部**（`nsenter` / systemd service 里），
@@ -300,7 +301,218 @@ NPM        npm config set registry        → 大陆源
 
 ---
 
-## 8. 停止与删除
+## 8. SSH：两层访问，别混
+
+LightOS 把 SSH 拆成**互不依赖的两层**。混在一起写会出两类 bug：端口冲突、以及"关了 SSH 还在监听"。
+
+| 层 | 谁负责 | 开关字段 | 落盘位置 |
+| --- | --- | --- | --- |
+| 实例内 `sshd` | **所属应用**（LightOS 自己实现） | `enable_ssh` + `ssh_port` | `/etc/lightos/lpk-ssh.env` → `/etc/ssh/sshd_config.d/lightos-lpk.conf` |
+| 宿主侧端口转发 | 可跨应用管理 | `ssh_forward_enabled` / `ssh_forward_port` / `ssh_forward_target_port` / `ssh_forward_target_selector` | 只在 runtime 状态里，不落盘 |
+
+宿主侧只做 `listen → 转发到实例 IP:port`，**不启动 sshd**。实例内 `sshd` 关掉时，
+转发即使开着也只会得到 "SSH target is not reachable"。
+
+### 8.1 实例内 sshd：`lightos-lpk-ssh-setup.sh`
+
+实测脚本（节选，`/usr/local/bin/`，由同名 oneshot service 调用）：
+
+```sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+env_file="/etc/lightos/lpk-ssh.env"
+if [ -f "${env_file}" ]; then set -a; . "${env_file}"; set +a; fi
+
+enabled="${LIGHTOS_LPK_SSH_ENABLE:-0}"          # 默认关闭
+requested_port="${LIGHTOS_LPK_SSH_PORT:-22}"
+network_mode="${LIGHTOS_LPK_SSH_NETWORK_MODE:-host}"
+listen_port="22"
+# 只有 host 网络才允许自定义端口；nat 下固定 22
+if [ "${network_mode}" = "host" ] && [ -n "${requested_port}" ]; then
+  listen_port="${requested_port}"
+fi
+
+if [ "${enabled}" != "1" ]; then
+  stop_ssh_service          # disable --now + stop
+  exit 0
+fi
+
+# 1. 缺 openssh 就装（apt / pacman，Arch 先修 keyring）
+ensure_openssh
+# 2. 运行时目录
+mkdir -p /run/sshd /var/run/sshd /etc/ssh/sshd_config.d
+# 3. 确保主配置 include 了 drop-in 目录
+ensure_sshd_include      # 把 'Include /etc/ssh/sshd_config.d/*.conf' 插到首行
+# 4. 生成缺失的主机密钥
+ssh-keygen -A
+
+# 5. 写覆盖配置
+cat > /etc/ssh/sshd_config.d/lightos-lpk.conf <<EOF
+Port ${listen_port}
+PermitRootLogin yes
+PasswordAuthentication yes
+KbdInteractiveAuthentication yes
+ChallengeResponseAuthentication no
+PubkeyAuthentication yes
+UsePAM yes
+EOF
+
+# 6. 等服务真起来（不是看 systemctl 返回码）
+if ssh_port_ready; then exit 0; fi
+wait_for_systemd_bus
+systemctl daemon-reload || true
+systemctl reset-failed "${svc}.service" >/dev/null 2>&1 || true
+systemctl restart "${svc}.service"
+ssh_port_ready
+```
+
+就绪探测（**这是"启动成功"的判据**，不要用 `systemctl is-active`）：
+
+```sh
+ssh_port_ready() {
+  command -v ssh-keyscan >/dev/null 2>&1 || return 1
+  timeout 3 ssh-keyscan -T 2 -t ed25519,ecdsa,rsa -p "${listen_port}" 127.0.0.1 >/dev/null 2>&1
+}
+```
+
+服务名兼容（Debian 叫 `ssh`，Arch 叫 `sshd`）：
+
+```sh
+resolve_ssh_service() {
+  for svc in ssh sshd; do
+    for d in /usr/lib/systemd/system /lib/systemd/system /etc/systemd/system; do
+      [ -f "$d/${svc}.service" ] && { echo "${svc}"; return 0; }
+    done
+  done
+  return 1
+}
+```
+
+端口探测（UI 用它校验"配置的目标端口"和"实际 sshd 端口"是否一致）：
+
+```sh
+detect_ssh_port() {
+  if command -v sshd >/dev/null 2>&1; then
+    sshd -T 2>/dev/null | awk '$1=="port"{print $2; exit}'
+  fi
+  # 回退：读 sshd_config 与 drop-in，取最后一个 Port
+}
+```
+
+### 8.2 密码：与系统登录密码**相互独立**
+
+UI 文案原文："默认关闭，密码独立于系统/微服登录密码；修改会关闭已有 SSH，不关闭浏览器终端。"
+"新密码非空即可；留空沿用当前密码。"
+
+实测行为：
+
+- `create` 只带 `username`，**不带密码**
+- 首次开启 SSH 时如果没有独立 SSH 密码，提示 `set an independent SSH password first`
+- 密码只存在于请求内存，不写浏览器存储
+- 变更密码会**先停 sshd**，再设新密码、再启动（`SSH password processing busy` 是并发保护）
+
+自研时最小实现：
+
+```sh
+# 宿主侧：把明文经 stdin 传给实例，不要进 argv / 日志
+printf '%s\n' "$SSH_PASSWORD" | nsenter -t "$PID" -m -p -- \
+  sh -c 'chpasswd -c SHA512'   # 或用 usermod -p "$(openssl passwd -6 ...)"
+
+# 设完立刻停用旧会话，避免旧凭据继续可用
+nsenter -t "$PID" -m -p -- systemctl restart "$(ssh_svc)"
+```
+
+> 别把 SSH 密码塞进 `/etc/lightos/seed.env`：那个文件是**首启系统用户**用的，
+> 首启结束就被删；SSH 密码是**运行期可改**的独立凭据。
+
+### 8.3 宿主侧转发：字段与校验
+
+`create` / `/api/instance/update` 里与转发相关的四个字段：
+
+```
+ssh_forward_enabled          bool
+ssh_forward_port             int   宿主监听端口（1024–65535）
+ssh_forward_target_port      int   实例内目标端口（通常 = 实际 sshd 端口）
+ssh_forward_target_selector  string 目标实例选择器（可跨应用）
+```
+
+实测校验链（`lightos-admin` 的 `apiProxy` 方法名，可直接当规格）：
+
+| 方法 | 职责 |
+| --- | --- |
+| `validateManagedSSHPortState` | 端口区间、是否与保留端口冲突 |
+| `findReservedSSHForwardPortOwner` | 宿主端口是否已被别的实例占用 |
+| `findReservedSSHServicePortOwner` | 实例内 sshd 端口是否重复 |
+| `findHostNetworkSSHForwardTargetOwner` | host 网络下目标端口归属 |
+| `checkSameInstanceManagedPortConflict` | 同一实例的 sshd 端口与转发目标端口互斥 |
+| `clearSSHForwardForHostPortTakeover` | 端口被接管时清理旧转发 |
+| `clearSSHForward` | 关闭转发（禁用 SSHD 时连带） |
+
+对应的用户可见错误：
+
+| 文案 | 触发 |
+| --- | --- |
+| `SSH port must be between 1024 and 65535` | 端口越界 |
+| `SSH port is reserved or already in use` | 宿主端口被占 |
+| `port is already in use on host network` | host 网络端口冲突 |
+| `Host network SSHD port is required` | 切到 host 但没给 `ssh_port` |
+| `Configured SSH forward target port {n} does not match detected SSHD port {m}` | 配置与实际不一致 |
+| `SSH forward is not ready.` / `SSHD is not ready.` | 探测未通过 |
+| `Disabling SSHD also disables SSH forwarding.` | 两者联动的提示 |
+
+**联动规则**：`enable_ssh=false` ⇒ `ssh_forward_enabled` 必须一起关；反之不成立
+（可以只做宿主转发，指向别的应用管理的实例）。
+
+### 8.4 实例内 sshd 的默认值
+
+| 项 | 默认 |
+| --- | --- |
+| `enable_ssh` | `false` |
+| `ssh_port` | 22（host 网络可改，nat 固定 22） |
+| `PermitRootLogin` | `yes` |
+| `PasswordAuthentication` | `yes` |
+| `PubkeyAuthentication` | `yes` |
+| `UsePAM` | `yes` |
+| `ChallengeResponseAuthentication` | `no` |
+
+> 这几条比发行版默认宽松（Debian/Arch 默认禁止 root 登录）。LightOS 是**单用户设备**模型，
+> 访问控制在 LightOS 账号层，不在 sshd 层。自研时若面向多租户，必须收紧。
+
+### 8.5 自研时的最小 SSH 实现
+
+```
+1. rootfs 里预装 openssh（或首启时装）
+2. 首启后写 /etc/lightos/lpk-ssh.env：
+     LIGHTOS_LPK_SSH_ENABLE=1
+     LIGHTOS_LPK_SSH_PORT=<ssh_port>
+     LIGHTOS_LPK_SSH_NETWORK_MODE=<network_mode>
+3. 放 lightos-lpk-ssh-setup.sh + oneshot service
+4. start 完成后用 ssh-keyscan 探活，把 ready/pending/error 写回状态
+5. 宿主转发单独实现：监听 → 连实例 IP:port → 双向 copy
+```
+
+**不要**把 sshd 做成 PID 1 或容器入口：实例的 PID 1 必须是 `/sbin/init`，
+否则 systemd 起不来，`enable_ssh` 也没法热切换。
+
+### 8.6 SSH 相关状态标记（脚本与上层约定）
+
+```
+__LIGHTOS_SSH_STATUS__:ready
+__LIGHTOS_SSH_STATUS__:pending
+__LIGHTOS_SSH_STATUS__:missing
+__LIGHTOS_SSH_STATUS__:error
+__LIGHTOS_SSH_DETECTED_PORT__:<port>
+__LIGHTOS_LPK_SSH_EXIT__:<code>
+__LIGHTOS_SYSTEMCTL_EXIT__:<code>
+```
+
+上层解析这些标记决定卡片显示 "SSH 已就绪 / 正在启动 / 已关闭 / 启动失败"，
+不要靠解析人类可读的日志文本。
+
+---
+
+## 9. 停止与删除
 
 ```
 stop
@@ -318,7 +530,7 @@ delete
 
 ---
 
-## 9. 自研时最少要复制的东西
+## 10. 自研时最少要复制的东西
 
 | 环节 | 必须做 | 可延后 |
 | --- | --- | --- |
@@ -329,10 +541,11 @@ delete
 | 自启 | 启动时重放 status==running | 失败重试策略 |
 | 停止 | SIGTERM → delete | cgroup 清理 |
 | 删除 | 要求先 stop | overlay umount 加固 |
+| SSH | sshd 脚本 + 探活 | 宿主转发 |
 
 ---
 
-## 10. 常见错误
+## 11. 常见错误
 
 | 现象 | 原因 |
 | --- | --- |
@@ -343,3 +556,6 @@ delete
 | 重启后实例全没了 | 没实现 §5 的 autostart 重放 |
 | `seed.env` 泄漏 | 用完没 `rm`，且它含明文密码 |
 | 实例卡在 starting | systemd 没起来；用 `nsenter ... systemctl is-system-running` 查 |
+| SSH 显示就绪但连不上 | 只看了 `systemctl is-active`，没做 `ssh-keyscan` 探活 |
+| 自定义 SSH 端口不生效 | `network_mode` 不是 host，脚本强制回 22 |
+| 关了 SSH 转发还在 | 只改了 `ssh_forward_enabled`，没停 listener |
