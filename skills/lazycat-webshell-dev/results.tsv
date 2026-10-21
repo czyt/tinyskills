@@ -2,3 +2,8 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-05-18T09:19	baseline	lazycat-webshell-dev	-	75.1	baseline	-	初始干跑评估：已覆盖 provider 发现/exec/forward/Catlink/Publish，但缺少同页返回、会话恢复、移动端和按键映射细节	dry_run
 2026-05-18T09:19	working-tree	lazycat-webshell-dev	75.1	87.6	keep	边界条件+指令具体性	补充 hidden_from_launcher 条件、same-page return、session restore、mobile UX、frontend key mapping，并压缩主 SKILL.md 到 Darwin 体积阈值内	dry_run
 2026-06-22T11:14	working-tree	lazycat-webshell-dev	87.6	88.7	keep	goal覆盖+测试集	基于lazycat-microserver-webshell抽象目标模型；补充多端一致性、generated response抑制、LightOS命令边界、UX事件分类、端到端测试prompt；独立verifier初评87.5后修复整体验证prompt缺口	dry_run
+2026-10-21T17:00	baseline	lazycat-webshell-dev	-	87.6	baseline	-	三评审盲评均值 87.6（85.8/90.5/86.6），加权短板 dim2 与 dim5	dry_run
+2026-10-21T17:05	79b609f	lazycat-webshell-dev	87.6	-	keep	资源整合	修正端点计数为 17 路径（评审丙发现 18→17）	dry_run
+2026-10-21T17:10	7ddd706	lazycat-webshell-dev	-	3-0 better	keep	工作流+反例	Phase 2-6 补输入/产出/完成判据，新增集中 Do Not 黑名单	paired
+2026-10-21T17:20	66837bc	lazycat-webshell-dev	-	3-0 better	keep	工作流+具体性	补 Phase 1 判据、lint 门禁、可配置默认值、Checkpoint 6 具体化	paired
+2026-10-21T17:35	6399ba2	lazycat-webshell-dev	-	3-0 better	keep	实例内容	新增 instance-runtime-injection.md：实例不注入任何文件/环境，exec 为宿主 nsenter	paired
