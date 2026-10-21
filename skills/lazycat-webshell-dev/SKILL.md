@@ -1,6 +1,6 @@
 ---
 name: lazycat-webshell-dev
-description: Use when developing or reviewing LazyCat/LightOS WebShell provider LPK apps, debugging provider discovery, launch URL, session restore, mobile terminal UX, lightos-admin return navigation, Catlink, lightosctl exec/forward, Publish API, or zellij/tmux/web terminal adapters. 触发词：开发WebShell provider、WebShell调试、LightOS终端、会话恢复、手机终端、lightosctl桥接。
+description: Use when developing or reviewing LazyCat/LightOS WebShell provider LPK apps, debugging provider discovery, launch URL, session restore, mobile terminal UX, lightos-admin return navigation, Catlink, lightosctl exec/forward, Publish API, or zellij/tmux/web terminal adapters; also when calling LightOS core /api/* directly, parsing yamux terminal streams, or replacing lightos-core. 触发词：开发WebShell provider、WebShell调试、LightOS终端、会话恢复、手机终端、lightosctl桥接、lightos-core契约、yamux终端流。
 ---
 
 # LazyCat WebShell Dev
@@ -63,6 +63,7 @@ resource_exports:
 | UX abstraction | Separate terminal byte path, workspace action path, frontend-only actions, and platform navigation |
 | Mobile terminal | Safe-area layout, visual viewport, touch shortcuts, IME-safe input, touch selection, no hover-only controls |
 | LightOS commands | Use `ps`, `system admin-info --json`, `exec`, optional `forward`, and public admin APIs for Publish/Catlink |
+| Core contract | Direct `/api/*` or yamux stream work: [lightosctl-core-contract.md](references/lightosctl-core-contract.md) — 17 endpoints, create fields, stream names, resize path |
 
 ## Workflow
 
@@ -149,6 +150,8 @@ resource_exports:
    | `/lzcinit/lightosctl exec -ti <selector> ...` | Allocate an interactive PTY shell for minimal bridge mode |
    | `/lzcinit/lightosctl forward ... <selector>` | Proxy an existing web terminal or service already running inside the target instance when using an adapter architecture |
 
+   Behind these commands is one narrow core API. Do not call it directly unless you are replacing or debugging lightos-core; when you do, take the exact endpoints, field names, yamux stream names, and error bodies from [lightosctl-core-contract.md](references/lightosctl-core-contract.md). Two facts that break naive clients: exec output is raw yamux named streams (not JSON frames), and exec exit codes are not transmitted.
+
    > ⏸️ **Checkpoint 6**: 在 lightos-admin 中确认 Catlink 状态可见、Publish API 可创建/更新/删除。
 
 ## 异常处理
@@ -173,6 +176,9 @@ Provider 在异构 LazyCat 环境中运行，以下边界情况须覆盖，避�
 | **Provider 未出现在列表** | ① `resource_exports[].kind: lightos.webshell` ② source → `./resources/lightos.webshell` ③ `default/webshell-provider.json` 存在 ④ LPK 已安装 |
 | **`lightos.manage` 权限缺失** | `lightosctl ps/exec` 需此权限；添加到 `permissions.required` 后重建 LPK |
 | **`admin-info` 返回空** | 回退：引导用户手动输入 admin URL；检查 `min_os_version` |
+| **自己调 `/api/*` 失败** | 检查 socket（`LIGHTOS_CORE_SOCKET`）与 `X-LightOS-Internal-Deploy-ID`/`-Service-Name` 两个头；`inspect` 不存在会返回 200+`error`，`create` 同名返回 400 `bundle already exists` |
+| **exec 流解析不出内容** | 响应 body 是 yamux v1，不是 chunked JSON；命名流由 SYN 帧 payload 给出（`control` / `exec-stdin` / `exec-stdout` / `exec-stderr` / `exec-pty`） |
+| **PTY resize 无效** | resize 走 `POST /api/exec-stream/{session_id}/pty-control`，路径是 session uuid 而非实例名 |
 
 传输协议偏好：**WebSocket**（默认） > **gRPC-stream**（需要 gRPC-Web proxy）> **connect-rpc**（HTTP/1.1 fallback 友好）。SSE+POST 仅用于日志流等单向推送场景，不适合交互式终端。
 
@@ -203,4 +209,6 @@ lzc-cli project release
 - mobile checks cover soft keyboard, IME, shortcuts, selection, browser back, safe areas, orientation, and offline/online
 - Catlink status and Publish API actions work when implemented.
 
-For protocol details, version notes, and failure diagnosis: [provider-contract.md](references/provider-contract.md). For runnable examples: [examples.md](references/examples.md).
+For protocol details, version notes, and failure diagnosis: [provider-contract.md](references/provider-contract.md).
+For the measured core API (endpoints, create fields, yamux frames, status/error bodies): [lightosctl-core-contract.md](references/lightosctl-core-contract.md).
+For runnable examples: [examples.md](references/examples.md).
