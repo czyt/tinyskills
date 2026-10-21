@@ -68,5 +68,10 @@
     "id": "lightosctl-core-contract",
     "prompt": "我的 provider 需要直接调用 lightos-core 的 /api/*（比如自己实现实例列表、PTY 或端口转发），请告诉我哪些端点/字段是稳定的，哪些不能依赖，以及 exec 流的具体帧格式和 resize 怎么发。",
     "expected": "指向 references/lightosctl-core-contract.md；说明传输是 unix socket + HTTP/1.1 + 两个 X-LightOS-Internal-* 头；列出 17 个端点及 create 全字段（含 rootfs_source_dirs、security_level、network_mode、bind_mounts[].owner）；exec 响应 body 是 yamux v1，命名流由 SYN payload 给出（control/exec-stdin/exec-stdout/exec-stderr/exec-pty），resize 走 POST /api/exec-stream/{session_id}/pty-control {\"action\":\"resize\",cols,rows}；说明退出码不在流里、inspect 不存在时返回 200+error、create 同名 400 bundle already exists；并提醒第三方 provider 应优先走 lightosctl 与 /unsafe_api/*。"
+  },
+  {
+    "id": "self-hosted-runtime",
+    "prompt": "我不想安装懒猫的 LightOS 应用，想自己做一个运行在懒猫平台上的实例管理器（自己的界面 + 自己管实例），还要能和现有的 WebShell provider 对接，应该怎么设计？",
+    "expected": "指向 references/self-hosted-runtime.md 与 lightosctl-core-contract.md §11；说明用普通 LPK + 自己的 core 进程，socket 放在 /lzcapp/run/sys/lightos-core.sock 并与 17 个 /api/* 契约对齐；给出 Instance 字段、create/start/stop/delete、exec-stream 的 yamux 流名、pty-control、OCI bundle 要点、overlay 布局、nsenter 进入方式、nat 网络、cgroup 统计、错误矩阵（inspect 返回 200+error、create 同名 400）；并给出推荐默认路径（docker build 出 rootfs、只支持 system 级别、先 host 后 nat、先用原版 lightosctl 回归）。"
   }
 ]
