@@ -68,6 +68,7 @@ resource_exports:
 | No LightOS dependency | Plain LPK / self-built runtime / lightos, pick one: [lightosctl-core-contract.md §11](references/lightosctl-core-contract.md) |
 | Build your own runtime | Full implementation spec (types, OCI bundle, overlay, nsenter, yamux, network, stats, error matrix, step order, effort table): [self-hosted-runtime.md](references/self-hosted-runtime.md) |
 | Distro differences | apt/pacman/ubuntu handling runs **inside** the instance, not as host chroot: [distro-adaptation.md](references/distro-adaptation.md) |
+| Instance lifecycle | rootfs → create files → runc start → firstboot → autostart → user/password → preinstalls → stop/delete: [instance-lifecycle.md](references/instance-lifecycle.md) |
 
 ## Workflow
 
@@ -231,6 +232,8 @@ Provider 在异构 LazyCat 环境中运行，以下边界情况须覆盖，避�
 - 不要在没跑过 `lightosctl` 回归前就接 UI：先用原版 CLI 逐条对齐错误矩阵，再让界面进来。
 - 不要把发行版适配写成宿主机 chroot 逻辑：平台没有这个能力，LightOS 也是在实例内用 `command -v apt-get/pacman` 与 `/etc/os-release` 判断。
 - 不要为"登录/应用安装/文件/硬件/用户"重写实现：那些是平台 gRPC，白拿。
+- 不要把开机自启做成实例内的 `systemctl enable`：auto-start 由 core 启动时重放 `status==running` 决定。
+- 不要在实例里留存明文密码：`/etc/lightos/seed.env` 必须在 firstboot 结束时删除。
 
 ## What Not To Copy Blindly
 
