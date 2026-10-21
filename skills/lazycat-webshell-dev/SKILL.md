@@ -69,6 +69,10 @@ resource_exports:
 
 ### Phase 1: 分类与确认
 
+**输入**：需求描述（是否要持久会话、是否已有实例内 web 终端）。
+**产出**：三选一的分类 + 传输协议。
+**完成判据**：能一句话说明"会话状态存在哪、PTY 由谁持有、浏览器用什么协议"。
+
 1. Classify the provider into one of three patterns:
    - **Minimal PTY bridge**: run `/lzcinit/lightosctl exec -ti '<name>@<owner_deploy_id>' /bin/sh` and bridge terminal I/O. Use WebSocket, gRPC-stream, connect-rpc, or SSE+POST by runtime fit.
    - **Persistent terminal**: keep tabs, panes, history, cwd, and commands in the target instance or an instance-local agent; tmux/zellij are valid implementations, not requirements.
@@ -80,7 +84,7 @@ resource_exports:
 
 **输入**：Phase 1 选定的分类 + 目标运行时。
 **产出**：`package.yml` / `lzc-build.yml` / `lzc-manifest.yml` / `webshell-provider.json` 四个文件。
-**完成判据**：`lzc-cli project lint` 无告警，且 `root_path` 与 route 前缀一致。
+**完成判据**：`lzc-cli project lint <dir>` 输出 `No manifest lint warnings found.`，且 `root_path` 与 route 前缀一致。
 
 2. Generate or review LPK metadata:
    - `package.yml`: declare display metadata and `permissions.required: [lightos.manage]`. Use `hidden_from_launcher: true` only for provider-only apps; omit it when the app can open standalone by selecting a default running instance.
@@ -111,7 +115,7 @@ resource_exports:
 **输入**：Phase 3 的 selector 校验与实例列表。
 **产出**：PTY 桥 + `state/action/activity/attach` 四个端点 + 有界历史。
 **完成判据**：刷新后 pane 恢复、双端输出一致、回放完成前拒收输入。
-**建议取值**：单 pane 历史 2 MB、输入队列 64 KB、重连退避 1s→2s→4s（上限 30s）、回放窗口 256 KB/帧。
+**默认取值**（可调，但要写成配置项）：单 pane 历史 2 MB、输入队列 64 KB、回放分块 256 KB、重连退避 1s→2s→4s（上限 30s）。
 
 4. Build the terminal bridge and session model:
    - For direct shell access, start `/lzcinit/lightosctl exec -ti selector /bin/sh -lc <bootstrap>` under a PTY or equivalent terminal process abstraction.
@@ -173,7 +177,7 @@ resource_exports:
 
    Behind these commands is one narrow core API. Do not call it directly unless you are replacing or debugging lightos-core; when you do, take the exact endpoints, field names, yamux stream names, and error bodies from [lightosctl-core-contract.md](references/lightosctl-core-contract.md). Two facts that break naive clients: exec output is raw yamux named streams (not JSON frames), and exec exit codes are not transmitted.
 
-   > ⏸️ **Checkpoint 6**: 在 lightos-admin 中确认 Catlink 状态可见、Publish API 可创建/更新/删除。
+   > ⏸️ **Checkpoint 6**: 在 lightos-admin 中确认两件事——Catlink 状态显示 `connected`；Publish 服务能创建、更新、删除。只做 WebShell 时本阶段可跳过。
 
 ## 异常处理
 
