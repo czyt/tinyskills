@@ -25,6 +25,7 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 
 ## 开发工作流
 
+0. **宿主先行（规划权限与配置契约）**：开发插件之前，宿主方先明确——①权限范围：哪些能力做成服务（服务面即权限面）、敏感操作收敛为哪些显式服务方法；②配置契约：插件的 config schema 与默认值；③状态存活期：哪些状态跨重启（需要宿主的持久化服务）。🔴 **CHECKPOINT：** 权限范围未定义时不开始写插件——先让宿主方确认服务面，否则插件要么拿到过大权限，要么中途返工等服务。
 1. **脚手架**：`rutis-host new <name> --lang node|bun|python|go|swift`（无 Rust 时：`npx @arcships/rutis-host new weather --lang node`）。生成的项目含插件源文件、免 host 单测、`rutis.dev.json`、发布 workflow。
 2. **写插件**：声明 `inject`（需要的服务）→ `apply(ctx, config)` 里 `ctx.use(name)` 取依赖、`ctx.provide(name, value)` 提供服务、`ctx.effect(cleanup)` 注册清理。配置用 JSON Schema（Go/Swift/Kotlin 从类型自动推导）。
 3. **单测**（不需要 host）：TS 用 `load()` from `@arcships/rutis/testing`；Python `rutis.testing.load`；Go `rutistest.Load`；Swift `RutisTest.load`；Bun `bun test`。strict 模式默认开启，单进程假设的代码在这里会失败——这是设计意图。
@@ -75,7 +76,30 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 - 十种特殊值各语言原生类型对应（时间/日期/二进制/大整数/Decimal/UUID…），JS 收到无对应类型的是字符串；构造用 `@arcships/rutis` 的 `rutis.datetime()` 等构造器。
 - 嵌套最深 64 层，超出发送方直接拒绝该次调用；循环引用、`NaN`/`Infinity`、JS Symbol、Go channel 不能跨进程。
 
-## 失败模式速查（症状 → 修复）
+## 配置、状态与权限（宿主先行职责）
+
+**宿主在开发插件之前就应明确提供的权限范围。** rutis 没有内置权限系统——插件以运行时进程的权限运行，能做什么由宿主把哪些能力做成服务、放在哪个 scope、连到哪个节点决定。宿主作者的职责清单：
+
+1. **权限范围 = 服务面**：插件能做的事 = 它 `inject` 到的服务。宿主先把能力边界设计成服务（如提供 `calendar.read` 而不是裸的 EventKit 句柄），敏感操作收敛为显式服务方法；不想给插件的能力就不要注册服务。
+2. **凭据不进配置文件**：token/密钥只走环境变量（`RUTIS_TOKEN` 等），宿主持有后按需作为服务提供或注入；进程运行中环境不可变，换凭据需重启宿主。
+3. **网络边界**：跨机节点用 wss + 证书（`listen` 强制 TLS，非回环地址无 TLS 不启动）；`rutis.json` 的 `runtimes.go.dir`/`swift.dir` 目录整体可信，应专用——放入二进制即等于给它宿主权限。
+4. **隔离手段**：运行时进程是隔离单位（一个语言运行时一个进程）；同键多环境用 `isolate`；多租户/多设备分组用 `instanced` 实例子树；`rows[].isolate` 给单行专属服务实例。
+
+### 配置的加载与保存
+
+- **加载**：宿主把 `rutis.json` 里 row 的 `config` 交给插件的 JSON Schema 校验后传给 `apply`；Go/Swift/Kotlin 从类型自动推导 Schema。`rutis-host check` 会打印每行的 schema——配置契约在开发期就应声明。
+- **热更新**：配置变更 → 清理函数跑 → 用新配置重新 `apply`（使用该插件的消费者跟着重启）。Rust 宿主用 `PluginFactory` + `view.update(cfg)`：校验失败（dry-run）什么都不动，成功才卸载重载。写插件时**不要缓存 config 到模块级变量**——重启语义靠 `apply` 重新拿配置。
+- **状态的保存与恢复**（官方三层模型，宿主规划、插件遵守）：
+
+| 状态存活期 | 存哪里 | 生命周期 |
+|---|---|---|
+| 单次加载 | `apply` 里创建 | 本代卸载即释放 |
+| 跨多次加载（重连、配置热更） | 更长寿的父插件或独立服务 | 随所有者释放 |
+| 跨进程运行 | 持久存储（文件/数据库） | 由应用的 save/restore 流程管理 |
+
+  rutis **不提供内置持久化**：插件状态要跨重启，由宿主应用设计保存/恢复流程（通常是一个 `state` 服务），插件通过 `inject` 使用它而不是自己摸文件系统。可重建的运行时资源（连接、任务）与必须保留的状态分开——依赖变化时重建前者、复用后者，把重载影响降到最小。
+
+
 
 | 症状 | 原因与修复 |
 |------|-----------|
@@ -90,6 +114,9 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 | 配置改了没生效 | `rutis.json` 运行中变更：Unix 发 `SIGUSR1` 或加 `--watch-config`；`runtimes.go/swift` 和 `remote` 的变更需重启宿主 |
 | Go/Swift 二进制没被加载 | 放进 `runtimes.go.dir`/`runtimes.swift.dir` 目录（目录整体可信，应专用）；`check` 会列出每个二进制及其 SDK/插件 API 版本，旧 SDK 编译的不能跑 |
 | 清理没跑完，退出码 2 | 清理超过 deadline（默认 10s）或期间收到第二个信号；清理不要无限等待，必须完成的工作不能只依赖 cleanup |
+| 配置改了但插件行为没变（读的是旧值） | 插件把 config 缓存到了模块级变量；配置热更的语义是"清理后重新 apply"——在 apply 里读配置，不从模块级拿 |
+| 宿主重启后插件状态丢了 | 状态只存在 apply 局部（单次加载存活期）；跨重启的状态需要宿主提供持久化服务（save/restore 流程），插件 inject 使用 |
+| 插件碰到了不该访问的能力 | 宿主没有先定义权限范围：能力被做成了服务就可被 inject。宿主在开发插件前应明确服务面——敏感操作收敛为显式服务，不注册即不可用 |
 
 ## 反例黑名单（不要做）
 
@@ -105,6 +132,9 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 | 8 | 凭据写进 `rutis.json` | 凭据只从环境变量读（`RUTIS_TOKEN` 等）；进程运行中无法撤销 token，需换 token 重启 |
 | 9 | 把热路径放在跨语言同步调用上 | 每次约 30µs 进程边界开销；热路径进 Rust 或单运行时 |
 | 10 | 在 `rutis.json` 里发明字段 | 未知字段是错误（rows 里是警告）；拼写错误从不被静默忽略 |
+| 11 | 把凭据/token 写进 row 的 `config` 或代码 | 凭据只走环境变量；config 会被打进 schema/check 输出 |
+| 12 | 插件自己摸文件系统存状态 | rutis 无内置持久化；跨重启的状态由宿主的 save/restore 服务管理，插件 inject 使用 |
+| 13 | 宿主作者先写插件后想权限 | 权限范围 = 服务面，开发插件**之前**宿主就要明确：哪些能力做成服务、哪些 scope、谁连得上来 |
 
 ## 参考与出处
 

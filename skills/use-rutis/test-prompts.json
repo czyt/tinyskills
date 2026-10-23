@@ -1,6 +1,32 @@
 [
-  {"id": 1, "prompt": "用 Python 给 rutis 写一个翻译插件：inject 一个 llm 服务，提供 translate(text, target_lang) 方法，配置项 source_lang 可选。给出完整步骤和代码。", "expected": "uvx rutis-host new --lang python 脚手架 → apply(ctx, config) 里 ctx.use/ctx.provide → define_plugin 声明 inject 和 JSON Schema config → rutis.testing.load 免 host 单测（strict 模式）→ uv run rutis-host dev → uv build/publish"},
-  {"id": 2, "prompt": "我的 rutis 插件一直卡在 waiting for its services，rutis-host check 说 nothing declares llm。怎么办？", "expected": "解释门控启动：inject 的服务必须有提供者；检查 rutis.json 是否缺一行提供 llm 的插件；区分声明提供 vs 运行时提供（check 的 warning 语义）；--strict 让 warning 变错误"},
-  {"id": 3, "prompt": "TypeScript 插件 emit 的事件，Python 插件能收到吗？我想要所有监听者都跑完再继续，失败了拿到所有错误，怎么做？", "expected": "能：一条逻辑事件总线跨语言/进程/机器，监听自动注册。用 await ctx.parallel(...)——等全部监听者、失败抛 AggregateError（按注册顺序）；对比 emit（不等待）、serial（第一个结果）、waterfall（链式 next）"},
-  {"id": 4, "prompt": "Go 插件里调用别的服务为什么会死锁或者对端认不出回调？", "expected": "Go 每个入站调用独立 goroutine（并发安全必须保证）；调用链 path 在 context.Context 里——必须把收到的 ctx 传下去，用 context.Background() 会丢链导致同步回调对端认不出；同步等待会重入，调别的服务时不要持锁"}
+  {
+    "id": 1,
+    "prompt": "用 Python 给 rutis 写一个翻译插件：inject 一个 llm 服务，提供 translate(text, target_lang) 方法，配置项 source_lang 可选。给出完整步骤和代码。",
+    "expected": "uvx rutis-host new --lang python 脚手架 → apply(ctx, config) 里 ctx.use/ctx.provide → define_plugin 声明 inject 和 JSON Schema config → rutis.testing.load 免 host 单测（strict 模式）→ uv run rutis-host dev → uv build/publish"
+  },
+  {
+    "id": 2,
+    "prompt": "我的 rutis 插件一直卡在 waiting for its services，rutis-host check 说 nothing declares llm。怎么办？",
+    "expected": "解释门控启动：inject 的服务必须有提供者；检查 rutis.json 是否缺一行提供 llm 的插件；区分声明提供 vs 运行时提供（check 的 warning 语义）；--strict 让 warning 变错误"
+  },
+  {
+    "id": 3,
+    "prompt": "TypeScript 插件 emit 的事件，Python 插件能收到吗？我想要所有监听者都跑完再继续，失败了拿到所有错误，怎么做？",
+    "expected": "能：一条逻辑事件总线跨语言/进程/机器，监听自动注册。用 await ctx.parallel(...)——等全部监听者、失败抛 AggregateError（按注册顺序）；对比 emit（不等待）、serial（第一个结果）、waterfall（链式 next）"
+  },
+  {
+    "id": 4,
+    "prompt": "Go 插件里调用别的服务为什么会死锁或者对端认不出回调？",
+    "expected": "Go 每个入站调用独立 goroutine（并发安全必须保证）；调用链 path 在 context.Context 里——必须把收到的 ctx 传下去，用 context.Background() 会丢链导致同步回调对端认不出；同步等待会重入，调别的服务时不要持锁"
+  },
+  {
+    "id": 5,
+    "prompt": "我的 rutis 插件要在配置改了之后不用重启整个宿主就生效，另外有些状态（比如用户 token）要在插件重启后还在，怎么设计？",
+    "expected": "配置：宿主改 rutis.json 后 SIGUSR1/--watch-config 热加载，行级变更触发清理+重新 apply（PluginFactory dry-run 语义）；状态：三层模型——跨重启的状态不放 apply 局部，由宿主提供 save/restore 持久化服务，插件 inject 使用；可重建资源与保留状态分离；token 属凭据走环境变量不进 config"
+  },
+  {
+    "id": 6,
+    "prompt": "我要给公司的 rutis 宿主规划插件系统，第三方开发者会往里写插件。权限方面要注意什么？",
+    "expected": "宿主在开发插件之前明确权限范围（服务面=权限面）：能力边界设计成显式服务、敏感操作收敛方法、不注册即不可用；运行时进程是隔离单位、isolate/instanced 分组隔离；凭据走环境变量；go/swift 目录整体可信应专用；跨机节点 wss+TLS 强制"
+  }
 ]
