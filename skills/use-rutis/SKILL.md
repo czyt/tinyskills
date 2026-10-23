@@ -1,6 +1,6 @@
 ---
 name: use-rutis
-description: Use when 编写 rutis 插件（TypeScript/Bun/Python/Go/Swift/Kotlin）、在 Rust 中嵌入 rutis host、写 rutis.json 运行配置、排查插件不启动/服务未提供/事件不触发/跨语言调用报错、热重载与生命周期异常、跨机器节点连接、需要服务按依赖启停或被替换时热切换。触发词：rutis、rutis-host、definePlugin、ctx.provide、inject、Cordis、plugin runtime、hot reload。
+description: Use when 编写 rutis 插件（TypeScript/Bun/Python/Go/Swift/Kotlin）、在 Rust 中嵌入 rutis host、写 rutis.json 运行配置、排查插件不加载/插件不启动/服务未提供/服务冲突/事件收不到/跨进程调用失败/死锁、热重载不生效、生命周期异常、跨机器节点连接、需要服务按依赖启停或被替换时热切换。触发词：rutis、rutis-host、definePlugin、ctx.provide、inject、Cordis、plugin runtime、hot reload、SyncWaitCycle。
 ---
 
 # rutis 插件开发
@@ -20,7 +20,8 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 | 写 Swift 插件（macOS 系统能力） | [swift-plugin.md](references/swift-plugin.md) |
 | 声明、ctx、事件五模式、跨进程传值规则 | [plugin-api.md](references/plugin-api.md) |
 | 写 rutis.json、部署、运行时管理 | [rutis-host.md](references/rutis-host.md) |
-| 项目背景与 Rust 内嵌 | [rutis-readme.md](references/rutis-readme.md) |
+| 项目背景与 Rust 内嵌（含 Rust/Kotlin 插件写法） | [rutis-readme.md](references/rutis-readme.md) |
+| 某个具体报错/症状（不启动、收不到事件、调用失败…） | 先查本文件「失败模式速查」；未命中再按主题查上表 |
 
 ## 开发工作流
 
@@ -28,6 +29,7 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 2. **写插件**：声明 `inject`（需要的服务）→ `apply(ctx, config)` 里 `ctx.use(name)` 取依赖、`ctx.provide(name, value)` 提供服务、`ctx.effect(cleanup)` 注册清理。配置用 JSON Schema（Go/Swift/Kotlin 从类型自动推导）。
 3. **单测**（不需要 host）：TS 用 `load()` from `@arcships/rutis/testing`；Python `rutis.testing.load`；Go `rutistest.Load`；Swift `RutisTest.load`；Bun `bun test`。strict 模式默认开启，单进程假设的代码在这里会失败——这是设计意图。
 4. **本地运行**：`rutis-host dev`（按文件变化热重载；Go/Swift 改动自动重建）。`rutis-host check`（不运行插件，列出每行的依赖/服务/配置 schema，CI 里用 `--strict`）。
+   🔴 **CHECKPOINT（发布门槛）：** 单测（strict 模式）与 `check --strict` 全部通过后才可发布；strict 失败是跨进程不兼容的信号，不是噪声。发布有副作用（push `v*` tag 即触发 npm/PyPI/Release），发布前向用户确认版本号与目标 registry。
 5. **发布**：TS/Python 推 `v*` tag 自动发 npm/PyPI；Go/Swift 出各平台二进制到 GitHub Release。
 
 ## 多语言对照速查
@@ -40,7 +42,7 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 | 清理 | `apply` 返回函数 或 `ctx.effect(fn)` | `return lambda: None` 或 `ctx.effect` | `ctx.Effect(func(ctx) error)` | `ctx.effect { }` |
 | 配置 | JSON Schema | JSON Schema（或模块变量 `Config`） | 类型 `C` 自动推导 | `@RutisConfig` Decodable 类型 |
 | 监听事件 | `ctx.on(name, fn)` | `ctx.on(name, fn)` | `ctx.On(name, fn)` | `ctx.on(name) { }` |
-| 五种发送 | `ctx.emit / parallel / serial / waterfall / bail` | 同左（await） | `ctx.Emit / Parallel / Serial / Waterfall / Bail` | `try ctx.emit / try await parallel / …` |
+| 五种发送 | `ctx.emit / parallel / serial / waterfall / bail` | 同左；`parallel`/`serial`/`waterfall` 需 await（`bail` 同步） | `ctx.Emit / Parallel / Serial / Waterfall / Bail` | `try ctx.emit / try await parallel / …` |
 
 **Rust**（核心 API）：`impl Plugin for T { fn apply(&self, ctx: &Ctx) }`，`ctx.provide(Greeting(...))`（按类型注册），`TypedPlugin` + `type Deps = (Arc<Greeting>,)` 按类型注入；宿主内 `#[rutis::service]` 标注的类型自动跨语言可见。**Kotlin**：`Rutis.define<C> { ctx, config -> }` + `@RutisService`/`@RutisClient` 注解（KSP 生成方法表）。完整代码见 [rutis-readme.md](references/rutis-readme.md) 的 In Rust 段。
 
@@ -86,7 +88,7 @@ rutis 是"会自我迭代的软件"的插件运行时：Rust 核心 + 多语言�
 | Go 并发崩溃 | 每个调用在独立 goroutine：提供的对象必须并发安全；**把收到的 ctx 传下去**（调用链在里面），不要用 `context.Background()` |
 | 水瀑布收不到下游结果 | waterfall 监听者没调 `next()`（等于否决）；Go 里 `next` 是最后一个参数 `rutis.Next`，Swift 是最后参数 `Rutis.Next<R>` |
 | 配置改了没生效 | `rutis.json` 运行中变更：Unix 发 `SIGUSR1` 或加 `--watch-config`；`runtimes.go/swift` 和 `remote` 的变更需重启宿主 |
-| Go/Swift 二进制没被加载 | 放进 `runtimes.go.dir`/`swift.dir` 目录（目录整体可信，应专用）；`check` 会列出每个二进制及其 SDK/插件 API 版本，旧 SDK 编译的不能跑 |
+| Go/Swift 二进制没被加载 | 放进 `runtimes.go.dir`/`runtimes.swift.dir` 目录（目录整体可信，应专用）；`check` 会列出每个二进制及其 SDK/插件 API 版本，旧 SDK 编译的不能跑 |
 | 清理没跑完，退出码 2 | 清理超过 deadline（默认 10s）或期间收到第二个信号；清理不要无限等待，必须完成的工作不能只依赖 cleanup |
 
 ## 反例黑名单（不要做）
