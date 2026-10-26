@@ -163,7 +163,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | 两个插件登录同一个 id 只有一个生效 | 选定的优先，否则后添加的优先；`magpie plugin use <名字> <id>` 改选，另一行会写明由谁提供 |
 | npm 包不自动更新 | 固定版本（name@1.2.3）停在原版本；`magpie plugin update` 装最新并取消固定；@magpie-community/* 才自动更新 |
 | Agent 插件不加载、提示 library | library 写了 mcp 必须同时写 mcpFormat（alma/claude/codex/… 之一），mcpFormat 不在列表也拒绝 |
--| 异步 hooks 整链超时被回滚 | onRequest 默认 1s：查 `gatewayTimeoutMs`（100–10000ms）与整链预算（2–10s）；改 model/stream/工具也会回滚——只做请求体增强；仍失败看设置 → 插件的失败计数 |
+| 异步 hooks 整链超时被回滚 | onRequest 默认 1s：查 `gatewayTimeoutMs`（100–10000ms）与整链预算（2–10s）；改 model/stream/工具也会回滚——只做请求体增强；仍失败看设置 → 插件的失败计数 |
 | `magpie plugin use` 提示找不到插件 | 同 id 双插件按名字/spec/短名定位；先 `m plugin --json` 看两个包各自由谁提供；仍不行卸载多余的那个 |
 | 签到 outcome 总是 failed | 返回了表外 outcome 或抛异常；2xx 但无可领要回 `done` 不是 failed；验证码回 `captcha` 绝不自动解；仍失败查账号作用域（getAuth 拿的是本账号）|
 | 面板/页面空白或显示已停止工作 | panels slot 只能 agents/usage/settings/provider；高度跟随 <html>（最高 2400px），别给 html/body 固定高度；10 秒内无应答判停 |
