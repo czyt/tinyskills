@@ -152,7 +152,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | 模型列表拉取失败全丢 | models 钩子失败时返回 `provider.models` 原样兜底；登录失效抛 `{signIn: "expired"}` |
 | 模型分流写了 `provider: {npm, api}` 不生效 | 那是 config 声明形状；`models` 钩子返回的 Model 要用 `api: { id, url, npm }` |
 | 多账号在列表里分不清 | api 方式无邮箱：加 `prompts` 备注名（key 用 `email`）存 `metadata.email` 命名 |
-| 拉用量失败把账号标成失效 | usage 钩子返回 `{error, signIn: "kept"}` 降级，别抛异常 |
+| 拉用量失败把账号标成失效 | usage 钩子返回 `{error, signIn: "kept"}` 降级；仍失败查网络/代理后重试；还不行挂 `aside` 型窗口别硬标失效 |
 | 其他插件能读到你的 API key | loader 的 `apiKey` 放了真 key：改固定占位符，真 key 只进 fetch 请求头 |
 | loader 的 fetch 把 key 发到别的域名 | 宿主会把它交给其他插件调用：fetch 里校验目标 origin 是厂商域名，不是就抛错 |
 | 中间件钩子不生效 | 检查运行环境限制（moejs：无 Node API；事件 50ms 超时）；`events` 导出只对有名字的事件 API 有效，Chat/Gemini 别写 |
@@ -163,6 +163,9 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | 两个插件登录同一个 id 只有一个生效 | 选定的优先，否则后添加的优先；`magpie plugin use <名字> <id>` 改选，另一行会写明由谁提供 |
 | npm 包不自动更新 | 固定版本（name@1.2.3）停在原版本；`magpie plugin update` 装最新并取消固定；@magpie-community/* 才自动更新 |
 | Agent 插件不加载、提示 library | library 写了 mcp 必须同时写 mcpFormat（alma/claude/codex/… 之一），mcpFormat 不在列表也拒绝 |
+-| 异步 hooks 整链超时被回滚 | onRequest 默认 1s：查 `gatewayTimeoutMs`（100–10000ms）与整链预算（2–10s）；改 model/stream/工具也会回滚——只做请求体增强；仍失败看设置 → 插件的失败计数 |
+| `magpie plugin use` 提示找不到插件 | 同 id 双插件按名字/spec/短名定位；先 `m plugin --json` 看两个包各自由谁提供；仍不行卸载多余的那个 |
+| 签到 outcome 总是 failed | 返回了表外 outcome 或抛异常；2xx 但无可领要回 `done` 不是 failed；验证码回 `captcha` 绝不自动解；仍失败查账号作用域（getAuth 拿的是本账号）|
 | 面板/页面空白或显示已停止工作 | panels slot 只能 agents/usage/settings/provider；高度跟随 <html>（最高 2400px），别给 html/body 固定高度；10 秒内无应答判停 |
 
 以上之外，实现纪律类红线见「反例黑名单」。
@@ -196,6 +199,6 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 - 本 skill 是决策与骨架参考；钩子的完整字段、usage 返回结构、宿主协议、pi 细节查 [references/plugin-doc-full.md](references/plugin-doc-full.md) 对应章节。
 - 实现前先看社区同名或同厂商的插件（[magpie-community/plugins](https://github.com/magpie-community/plugins)）有没有现成登录逻辑可参考；社区仓库的 `bun scripts/check.mjs <name>` 可离线校验钩子。
 - **单文件全功能范例**：[egenchen/magpie-packycode](https://github.com/egenchen/magpie-packycode)——key 占位符、fetch 域名防护、config 合并、动态模型、usage 卡片（失败降级 `signIn: "kept"`）、`auth.options` 开关卡片（含 confirm）、多 key 故障转移、node --test + CI，UI/交互写法看它一个文件够了。
-- **单 provider 多协议分流范例**：社区仓库 [packages/zed](https://github.com/magpie-community/plugins/tree/main/packages/zed)（单 provider 托管 Claude/GPT/Gemini，`api: {id, url, npm}` 按模型分协议）与 [packages/zcode](https://github.com/magpie-community/plugins/tree/main/packages/zcode)（`X-Magpie-Sign-In: kept` 响应包装、select+hint 登录提问、usage 窗口换算）；API key 多账号备注名同见 zcode/packycode。
+- **登录状态/多账号/多协议分流范例**：社区仓库 packages/zed（`api: {id, url, npm}`）、packages/zcode（`X-Magpie-Sign-In: kept` 包装、usage 窗口换算）、packages/packycode 同仓库路径（多 key 故障转移）；API key 多账号备注名同见 zcode/packycode。
 - **Agent skill 形态的范例**：[magpie-quota](references/example-magpie-quota-skill.md) 是社区官方 skill（让 agent 查额度/等待恢复），展示了好的 skill 写法——frontmatter description 只写触发条件、命令+JSON 结构速查、"Don't" 黑名单收尾、明确 exit codes。给 magpie 生态写 skill（社区仓库 `skills/<name>/SKILL.md`）或写插件时可参照它的结构与克制。
 - references/plugin-doc-full.md 已更新为 2026-10-26 抓取的最新官方文档（含签到、异步网关请求钩子、onProvider、panels、serviceTiers、actions/replaces、更新机制）；`auth.refresh` 需 v0.1.684+，`auth.checkin` 需 v0.1.1083+（文档示例标注 v0.1.676）。
