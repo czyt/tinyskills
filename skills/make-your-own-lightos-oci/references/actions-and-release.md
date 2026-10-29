@@ -109,6 +109,8 @@ skopeo inspect --authfile "$auth" --config --raw "docker://$image:$version" > re
 只有明确 manifest/name unknown 才是不存在；denied、unauthorized、429、超时都不是。
 注册表拒绝 preserve-digests 时保留失败证据、检查媒体类型/压缩，不静默删 flag 改成不同 artifact。
 两边 manifest SHA 与准备 manifest 相同、raw config 等价后才创建 prerelease。
+若交付的是公开镜像，再以匿名身份回读两边 manifest/config；有凭据 push 成功不证明新 GHCR package 已公开。
+在 GitHub runner 检查 package visibility 和 `skopeo inspect --no-creds`，无需把 registry token 交给 LightOS 实例。
 上传小 receipts（来源 lock、config、manifest/archive hashes、镜像 digest 列表），不要求把数 GB OCI tar 再当 release asset 上传。
 
 ## 修复与发布后核验
