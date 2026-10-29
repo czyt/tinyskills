@@ -1,0 +1,6 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-10-29	working-tree	make-your-own-arch-distro	-	-	baseline	参考检索	3个无skill场景；安全基础良好，rootfs工厂与具体源码/初始化信息缺失	full_test
+2026-10-29	working-tree	make-your-own-arch-distro	-	-	partial	具体性	4个带skill场景；B/C/D检索与安全边界符合，A仍略写rootfs产物	full_test
+2026-10-29	working-tree	make-your-own-arch-distro	-	-	pass	具体性	同题新上下文回归明确rootfs/live-target/ISO/维护四个交付栏	full_test
+2026-10-29	working-tree	make-your-own-arch-distro	-	2-1 better	blocked-on-sources	资源核验	首轮两better/slight一worse/clear；3名均指出坏深链，事实门禁阻断，不因多数忽略	paired
+2026-10-29	working-tree	make-your-own-arch-distro	-	3-0 better	keep	资源核验	修正并读3处官方正文；最终3名better/slight且gate通过，dim8均unknown，不冒充真机实测	paired
