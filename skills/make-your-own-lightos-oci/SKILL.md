@@ -134,7 +134,7 @@ lighos-init install --root "$root" --config profiles/lightos.toml
 已有明确授权则直接执行，不重复索要。不得把 rc.1 授权扩展为 rc.2、stable 或 latest。
 
 - 真实 LightOS gate 未闭合时只能发布明确实验性的 RC，不称已完整适配，不更新 `latest`/stable。
-- 晋级已验收产物时只允许 version label 改变；原始 config JSON、所有 layer descriptor 和文件树不变；重验晋级产物。
+- 晋级已验收产物时只允许 version label 改变；比较原始 config JSON 时仅移除双方该 label，其余字段、所有 layer descriptor 和文件树必须相同；重验晋级产物。
 - 使用 `skopeo inspect --config --raw`，避免结构化重序列化隐藏未知配置字段。
 - `skopeo copy --preserve-digests` 推相同 archive 至 GHCR/Docker Hub；存在相同 digest 可跳过，存在不同 digest 拒绝覆盖。
 - 回读两边原始 manifest/config 与准备产物比较；上传 provenance/hash receipts，registry secrets 不进入 build/rootfs/日志。

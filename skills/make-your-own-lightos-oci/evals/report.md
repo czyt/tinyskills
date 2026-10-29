@@ -54,3 +54,15 @@ An additional publication lesson is recorded separately in the release
 reference: public delivery requires anonymous registry readback, not just an
 authenticated push. This reference update is not counted as the paired
 SKILL.md checkpoint optimization.
+
+## Follow-up completeness pass
+
+The optimized baseline structural gate 40841712581 is GREEN. A follow-up adds
+two held-out reasoning scenarios (five cases/25 assertions total): bare Arch
+vs actual Pond desktop provisioning, release-package vs main Niri capability,
+non-secret compositor selection, rolling-package reproducibility, non-systemd
+Debian adapter boundaries, and the precise version-label comparison exception.
+The new reference also distinguishes the already-proven Pond Cage transaction
+from a full desktop installation manifest; it does not claim that bare-rootfs
+or Debian runtime acceptance has been executed. Independent review and the
+expanded reasoning/structural gates are recorded after their results arrive.

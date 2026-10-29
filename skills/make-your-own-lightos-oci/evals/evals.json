@@ -18,6 +18,18 @@
       "prompt": "AUR包会生成auth并enable两个远程服务，平台先注入seed后晚到remote env。保留Niri/Pond桌面，升级不重启session，没有真实LightOS访问权限。怎么预装、初始化、验收并发rc.1？",
       "expected_output": "使用包支持的命令级stage-only，不永久ENV；平台owns账号auth，kit仅post-setup；保留canonical names和原生shell；动态UID/HOME；晚到disabled负例；transport独立；synthetic明确；exact rc.1不更新stable。",
       "assertions": ["不事后disable补救生成auth", "不自行创建账号认证", "两种remote unit保留", "PID及starttime/应用保持", "缺平台验收只能有界RC声明"]
+    },
+    {
+      "id": 4,
+      "prompt": "我给的是裸Arch rootfs，不含Pond桌面。装个quickshell和cage就算Pond了吧？最新版AUR支持stage-only，是不是一定支持main里的Niri？请给出预装和选择compositor的步骤，并说明滚动包仓库对重建的影响。",
+      "expected_output": "区分compositor、shell引擎、发行版shell/config和应用；可信manifest签名事务；不把stage-only等同Niri；核验包版本能力和unit override；非秘密COMPOSITOR=niri不接管auth；锁包快照或只复用同artifact不声称逐字节重建。",
+      "assertions": ["quickshell/cage不等于Pond", "不执行磁盘installer装桌面", "stage-only不等于Niri能力", "使用非秘密native override不生成auth", "滚动仓库破坏未锁包集的重建确定性"]
+    },
+    {
+      "id": 5,
+      "prompt": "rootfs改成Debian无systemd，可以直接用lighos-init prepare-keyrings吗？另外RC晋级只能改version label，但验证器说raw config必须完全相同，这两条怎么兼容？",
+      "expected_output": "拒绝盲套Arch/systemd adapter，generic工具仍复用；明确先实现匹配distro/init的adapter；raw config比较只移除双方version label，其余包括未知字段完全相同，layer descriptors及文件不改。",
+      "assertions": ["拒绝Debian无systemd盲套Arch adapter", "复用通用fetch/inspect/clean而非声称完全不能打包", "只豁免双方version label", "未知配置字段也必须保留", "layer和文件树不变"]
     }
   ]
 }

@@ -49,9 +49,9 @@ jobs:
                       assert destination.is_file(), target
           evaluation = json.loads((root / 'evals/evals.json').read_text())
           assert evaluation['skill_name'] == root.name
-          assert len(evaluation['evals']) == 3
-          assert len({case['id'] for case in evaluation['evals']}) == 3
+          assert len(evaluation['evals']) >= 3
+          assert len({case['id'] for case in evaluation['evals']}) == len(evaluation['evals'])
           for case in evaluation['evals']:
               assert case['prompt'] and case['expected_output'] and case['assertions']
-          print('PASS: frontmatter, bounded entrypoint, resource links and three evaluation cases')
+          print(f"PASS: frontmatter, bounded entrypoint, resource links and {len(evaluation['evals'])} evaluation cases")
           PY

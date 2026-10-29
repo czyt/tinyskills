@@ -85,6 +85,39 @@ render generator 发现已映射 DRM render 字符设备的 numeric GID，生成
 
 ## 桌面预装与 native owner
 
+### 桌面已存在，还是从裸 rootfs 安装
+
+先输出一张 manifest，不凭发行版名称猜已安装组件：
+
+| 项目 | 审计证据 | 缺失处理 |
+|---|---|---|
+| init/包管理器 | systemd 可执行文件、pacman DB、os-release 实际目标 | 非 Arch/systemd 转对应 adapter，不套下面命令 |
+| compositor | `/usr/bin/niri`、wayland session 文件、版本/实际 backend | 在受支持的签名仓库安装所选 compositor；非 Niri 另做 owner 适配 |
+| shell 和品牌配置 | `qs`、shell 包、skel include 全链、QML/resources | 从可追溯的发行版包/配置来源预装；安装 quickshell 本身不等于安装 Pond shell |
+| 应用/字体/portal | 包清单、desktop entries、字体、terminal、portal backend | 按所选桌面补齐，不能把测试工具当用户应用 |
+| 远程 owner 运行依赖 | 固定版本 remoted 的依赖检查及实际启动 | 补已验证依赖；Pond 案例需要 Cage，不意味着交付桌面被替换成 Cage |
+| session 环境 | private D-Bus、XDG runtime、Wayland/Niri socket、HOME | 用 owner 的公开机制传播；不拷贝宿主 session 环境 |
+
+已有 Pond：保留原桌面，只安装经过实际失败证明缺失的依赖。裸 Arch：先从上游受信任的 package manifest 建立 `packages` 数组，安装 compositor、shell、原生桌面配置、应用及其依赖；不要执行完整磁盘 installer 来“顺便装桌面”。没有可重现的 Pond shell/config 来源就不能把一个普通 Niri 桌面叫作 Pond。
+
+下面是**已有 Pond payload** 实际采用的事务形式，`packages=(cage)` 不是从裸 rootfs 安装完整桌面的包清单：
+
+```sh
+packages=(cage)
+lighos-init prepare-keyrings --root "$root" --config profiles/lightos.toml --apply
+bwrap --unshare-pid --unshare-ipc --unshare-uts --hostname desktop-image-build \
+  --die-with-parent --bind "$root" / --proc /proc --dev /dev \
+  --perms 1777 --tmpfs /dev/shm --dir /run/systemd/resolve \
+  --ro-bind /etc/resolv.conf /run/systemd/resolve/stub-resolv.conf --clearenv \
+  --setenv PATH /usr/bin:/bin --setenv LANG C.UTF-8 \
+  /usr/bin/pacman -Syu --noconfirm --needed "${packages[@]}"
+```
+
+执行前确认 root 为可信、独占、无敏感状态的 GitHub staging。DNS bind 路径仅对应已审计的 Pond `resolv.conf -> /run/systemd/resolve/stub-resolv.conf`；其他 rootfs 先检查其实际布局，不能照搬路径。
+rootfs 包事务拥有 runner 网络，但环境已清空，不转发 token、代理密码或 registry auth。记录事务后的完整包版本，再清理 build-private GPG/cache；滚动仓库会变化，rootfs hash + recipe pin 本身不能使以后重新 `-Syu` 得到逐字节相同的包集。严格重现需另锁可信包快照/版本/摘要；否则复用同一个已验收 artifact 发布两边，不宣称源码重建必然相同。
+
+### 明确选择 compositor，再激活
+
 先审计发行版原桌面启动链。Pond 案例是 Niri 配置 includes → `/usr/share/pond-interface/config/niri/shell` → `qs -c pond-shell`。
 这些是案例，不是所有 rootfs 的固定路径。完整保留 skel、相对 include、wallpaper/sidebar、应用和 dbus/PipeWire 环境。
 
@@ -92,6 +125,20 @@ render generator 发现已映射 DRM render 字符设备的 numeric GID，生成
 
 1. **AUR 包路线**：审计 PKGBUILD/.install；非 root 构建、核对 GitHub 资产 checksum；在 rootfs namespace 的包安装命令上使用已验证的 `LIGHTOS_REMOTED_PACKAGE_STAGE_ONLY=1 pacman -U ...`。不得把 stage-only 永久留 Docker ENV。仅当该包版本确实支持 staging 时使用。
 2. **固定源码路线**：在 GitHub 构建已审核提交的 remoted/frontend，再调用其真实支持的 `install-service --stage-only --test-root "$root"`。该 flag 是这个程序的 staging 接口，不是通用 systemd 命令。记录程序 SHA，验证最终已安装程序，不在验收时覆盖它。
+
+**STOP — 能力与版本不匹配：**支持 stage-only 不等于支持 native Niri。核对实际包对应的 release/tag、CLI compositor 枚举、内置 unit 和 Niri 集成 CI；不能把 main 的能力归给较早的 AUR release。旧包 pre-upgrade hook 也可能先于 staging 支持，不能假设一个环境变量能让旧 rootfs 的升级变安全。存在旧激活/认证状态时先回到干净来源，不能直接试安装。
+
+对已验证 native Niri 能力的版本，Pond 配方离线写入**非秘密**的后加载配置：
+
+```sh
+install -d -m 0755 "$root/etc/lightos"
+printf '%s\n' 'LIGHTOS_REMOTE_DESKTOP_COMPOSITOR=niri' \
+  > "$root/etc/lightos/remote-desktop-native.env"
+chmod 0644 "$root/etc/lightos/remote-desktop-native.env"
+```
+
+先确认该固定版本的两个内置 unit 确实加载此 override；不要创建 `/etc/lightos/remote-desktop.env`，后者的认证仍由平台/remote 激活流程所有。未显式选 compositor 的默认 owner 可能仍是 Cage/Hyprland。
+动态 user/HOME 绑定、平台远程 enable/disabled 策略和 late settings 必须另验；这个非秘密设置不负责创建账号、注入认证或启动服务。
 
 远程项目：`https://github.com/ca-x/lightos-remote-desktop`，AUR 细节读其 `docs/aur.md`。
 `lightos-remoted-bin` 主程序路径 `/usr/lib/lightos-remoted/lightos-remoted`。
