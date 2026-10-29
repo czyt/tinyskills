@@ -128,7 +128,11 @@ lighos-init install --root "$root" --config profiles/lightos.toml
 
 产物：两个 registry 的同一 manifest digest、GitHub Release/Prerelease、可重现 receipts。
 
-- 发布前独立 review，确认源/boot run 与锁定候选一致，用户授权的具体版本与通道一致。
+**CHECKPOINT — 发布授权：**完成独立 review，确认源/boot run 与锁定候选一致。
+首次 registry push、创建 Release 或晋级前，列出 exact version、通道、候选 digest、
+目标 registries 和未闭合 gates。若当前请求尚未明确授权这些发布参数，**STOP，等待用户确认**；
+已有明确授权则直接执行，不重复索要。不得把 rc.1 授权扩展为 rc.2、stable 或 latest。
+
 - 真实 LightOS gate 未闭合时只能发布明确实验性的 RC，不称已完整适配，不更新 `latest`/stable。
 - 晋级已验收产物时只允许 version label 改变；原始 config JSON、所有 layer descriptor 和文件树不变；重验晋级产物。
 - 使用 `skopeo inspect --config --raw`，避免结构化重序列化隐藏未知配置字段。

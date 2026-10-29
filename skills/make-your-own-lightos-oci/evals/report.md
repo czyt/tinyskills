@@ -34,7 +34,23 @@ one skill; stop after that scope and expose the result for human review.
 
 ## Paired optimization
 
-Pending: three independent judges compare the initial committed SKILL.md with
-the candidate in one call each. Retain only on majority better/tie, then rerun
-the same reasoning prompts. Record votes and any remaining limitations, not an
-invented new absolute score.
+Three independent judges compared initial commit b1e936a with the candidate in
+one call each: **3–0 better**, margins clear/slight/slight. All identified the
+explicit checkpoint and already-authorized proceed branch as the improvement;
+two called the gain slight because the prior text already had release policy.
+Keep this one focused change; do not continue adding text for a higher score.
+
+Pressure test: all judges proceed for an already approved exact rc.1, but stop
+before publishing unapproved rc.2. Independent re-evaluation retains **15/15**
+assertions, with no observed regression. No new absolute score was assigned.
+This tests agent reasoning under instructions, not execution of the image flow.
+
+Initial structural CI 40840927013 is GREEN: YAML metadata, bounded entrypoint,
+relative resource containment/existence and three distinct evaluation cases.
+That validator does not check external URLs/anchors or execute the reasoning
+prompts. Final optimized commit runs the same gate separately.
+
+An additional publication lesson is recorded separately in the release
+reference: public delivery requires anonymous registry readback, not just an
+authenticated push. This reference update is not counted as the paired
+SKILL.md checkpoint optimization.
