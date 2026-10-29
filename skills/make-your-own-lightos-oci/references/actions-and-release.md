@@ -20,6 +20,7 @@ docs/acceptance.md              # passed/failed/unverified evidence
 
 不凭空设计全部脚本。优先读取并复用 `https://github.com/dockers-x/pond-oci` 的已审核脚本：
 `scripts/package-desktop.sh`、`check-hardlinks.py`、`stage-desktop.sh`、`probe-systemd.sh`、
+`scripts/resolve-rootfs.py`、`fetch-rootfs.sh`、`check-desktop-layer.py`、
 `.github/workflows/probe-remote-desktop.yml`、`probe-systemd.yml`、`publish-rc.yml`。
 固定源提交、核对其 CI，再提取 generic mechanism；Pond 仓库 keyring/compositor/path/masks 必须换为目标发行版策略。
 参考项目不是所有未来版本都正确的依赖，不能复制其旧 acceptance 声明当新项目证据。

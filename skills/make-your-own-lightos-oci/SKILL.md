@@ -39,6 +39,7 @@ description: 从基础 Linux rootfs 制作、验证并发布 LightOS OCI 镜像�
 - rootfs 是目录树及其 owner/mode/link/ACL/xattr/capability 等元数据，不是只含文件内容的目录。
 - OCI 是内容寻址的 layer、config、manifest；`diff_id` 对应未压缩 layer 内容，不等于压缩 blob digest 或外层 OCI tar 的 SHA。
 - OCI 默认 CMD 不包含完整 LightOS runc bundle。平台负责物化、namespace、存储、网络、映射设备、身份和代理。
+- OCI 实例使用宿主内核；ISO installer 的 GPT/ESP/BIOS、bootloader、磁盘格式化和 Btrfs 分区规划不属于 rootfs 转换。不要执行 installer 来初始化容器，也不要因不启动镜像内核就盲删受包管理器管理的文件。
 - 镜像不应携带 seed、实例账号密码、远程认证、SSH host keys、machine-id 或成功初始化状态。
 - 清理要在最终 layer 生成前完成；后续 layer 的 `rm` 不能减掉旧层内容或抹去旧层秘密。
 

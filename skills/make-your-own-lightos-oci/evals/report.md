@@ -64,5 +64,14 @@ non-secret compositor selection, rolling-package reproducibility, non-systemd
 Debian adapter boundaries, and the precise version-label comparison exception.
 The new reference also distinguishes the already-proven Pond Cage transaction
 from a full desktop installation manifest; it does not claim that bare-rootfs
-or Debian runtime acceptance has been executed. Independent review and the
-expanded reasoning/structural gates are recorded after their results arrive.
+or Debian runtime acceptance has been executed.
+
+Source/reference review finds no evidenced P1/P2; the Cage transaction and
+native override were checked against the actual recipe and remote source/docs.
+GitHub structural gate 40846259096 at 6c55fd5 is GREEN. Independent reasoning
+evaluation answers all five scenarios and satisfies **25/25** visible assertions.
+These visible assertions establish coverage in that exercise, not independent
+generalization or an executed image gate. No bare-Arch→Pond locked package
+manifest is supplied or claimed; missing trusted desktop inputs must be resolved
+before installation. The kernel/installer boundary is clarified separately:
+OCI uses the host kernel; GPT/ESP/BIOS/bootloader/formatting is not OCI init.
