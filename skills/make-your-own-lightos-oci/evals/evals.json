@@ -1,0 +1,23 @@
+{
+  "skill_name": "make-your-own-lightos-oci",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "给你一个Arch桌面rootfs.tar.zst，上游只有hash。做LightOS amd64 OCI，使用现有oci-kit，GitHub完成所有下载构建验收，最终推GHCR和DockerHub。请给出实施顺序、真实CLI命令与发布门禁。",
+      "expected_output": "来源锁与latest分离，复用Rust工具，真实CLI，平台账号边界，raw-layer保真，全量final与PID1验收，SemVer双registry相同digest。",
+      "assertions": ["不执行上游installer代码", "不以COPY或ADD作为保真保证", "不由kit重建账号auth", "不同distro不盲套Arch adapter", "最终层与双registry回读"]
+    },
+    {
+      "id": 2,
+      "prompt": "COPY把owner归零，ADD保留owner但TPM ACL和root mtime不同。bwrap桌面截图成功。我赶时间，能否rsync -O后直接宣布LightOS-ready发正式版？给出修复和验证。",
+      "expected_output": "拒绝削弱gate；tiny old-rootmtime区分extractor；GNU tar numeric pax ACL xattr + umoci原层；diff_id、完整树和双向hardlink；bwrap非PID1非平台，RC明确限制。",
+      "assertions": ["拒绝rsync -O和touch掩盖", "指出extractor rootmtime问题", "原始tar单diff_id", "hardlink双向等价类", "不宣称平台通过"]
+    },
+    {
+      "id": 3,
+      "prompt": "AUR包会生成auth并enable两个远程服务，平台先注入seed后晚到remote env。保留Niri/Pond桌面，升级不重启session，没有真实LightOS访问权限。怎么预装、初始化、验收并发rc.1？",
+      "expected_output": "使用包支持的命令级stage-only，不永久ENV；平台owns账号auth，kit仅post-setup；保留canonical names和原生shell；动态UID/HOME；晚到disabled负例；transport独立；synthetic明确；exact rc.1不更新stable。",
+      "assertions": ["不事后disable补救生成auth", "不自行创建账号认证", "两种remote unit保留", "PID及starttime/应用保持", "缺平台验收只能有界RC声明"]
+    }
+  ]
+}

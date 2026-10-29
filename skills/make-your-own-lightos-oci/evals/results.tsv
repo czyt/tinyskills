@@ -1,0 +1,2 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-10-29	baseline	make-your-own-lightos-oci	-	92.1	baseline	4	3 reasoning prompts;15 assertions pass;explicit publication checkpoint weakest	full_test

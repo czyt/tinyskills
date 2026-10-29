@@ -1,0 +1,57 @@
+name: Validate LightOS OCI skill
+
+on:
+  push:
+    paths:
+      - skills/make-your-own-lightos-oci/**
+      - .github/workflows/validate-lightos-skill.yml
+  pull_request:
+    paths:
+      - skills/make-your-own-lightos-oci/**
+      - .github/workflows/validate-lightos-skill.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y python3-yaml
+      - name: Check frontmatter, resource links and evaluation cases
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import re
+          import yaml
+
+          root = Path('skills/make-your-own-lightos-oci')
+          text = (root / 'SKILL.md').read_text()
+          match = re.match(r'^---\n(.*?)\n---\n', text, re.S)
+          assert match, 'Missing YAML frontmatter'
+          metadata = yaml.safe_load(match[1])
+          assert set(metadata) == {'name', 'description'}
+          assert metadata['name'] == root.name
+          assert 0 < len(metadata['description']) <= 1024
+          assert len(text.splitlines()) < 500
+          for document in root.rglob('*.md'):
+              for target in re.findall(r'\]\(([^)]+)\)', document.read_text()):
+                  if '://' not in target and not target.startswith('#'):
+                      destination = (document.parent / target.split('#')[0]).resolve()
+                      assert destination.is_relative_to(root.resolve()), target
+                      assert destination.is_file(), target
+          evaluation = json.loads((root / 'evals/evals.json').read_text())
+          assert evaluation['skill_name'] == root.name
+          assert len(evaluation['evals']) == 3
+          assert len({case['id'] for case in evaluation['evals']}) == 3
+          for case in evaluation['evals']:
+              assert case['prompt'] and case['expected_output'] and case['assertions']
+          print('PASS: frontmatter, bounded entrypoint, resource links and three evaluation cases')
+          PY
