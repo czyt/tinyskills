@@ -15,7 +15,7 @@ description: Use when converting Docker Compose or Docker Run apps to LazyCat LP
 |-------------|--------|
 | 社区 / 自用 Docker 管理应用需要 `docker.sock` | 保留必需挂载；按 [architecture.md](references/architecture.md) 核实 daemon 路径与权限后继续转换，不强制迁移 LightOS |
 | 上架商店或申请激励 | 查 [store-rule.md](references/store-rule.md)；将审核、激励与自用配置分别判断，不能推导 socket 全面禁令 |
-| 决定发布目标（社区商店 vs 官方商店） | **非激励应用默认发布到私有/社区商店（喵喵商店），不上传官方商店；提交官方商店必须用户确认。** 配置与机制见 [publish-workflow.md](references/publish-workflow.md)「发布目标决策」及 lazycat-github-action skill |
+| 决定发布目标（社区商店 vs 官方商店） | **发布目标由用户确认，默认推荐官方商店（2026-10 起激励不分应用类型：下载破 100 即 100 元 + 打赏）。** 配置与机制见 [publish-workflow.md](references/publish-workflow.md)「发布目标决策」及 lazycat-github-action skill |
 | 按用户更新启动器图标 | 查 [dynamic-icon.md](references/dynamic-icon.md)：v1.6.2+，运行时 PNG 文件，不新增 manifest 图标字段 |
 | 升级 v1.6.2 后 `exec://` 不健康 | 查 [healthcheck.md](references/healthcheck.md)：声明的本地端口已纳入自动监测，必须与实际监听一致 |
 | 升级 v1.6.1 后 FUSE 失效 | 默认 `/dev/fuse` 挂载已取消；声明 `fuse.mount` 并使用系统注入的 `/lzcinit/fusermount3` |
@@ -81,6 +81,7 @@ LPK v2（tar 格式，包含 `package.yml`）是 lzcos v1.5.0+ 才支持的特�
 | **`user.notify` 权限** | **v1.6.0** | **向用户发送通知** |
 | **`fuse.mount` 权限** | **v1.6.1** | 注入 `/lzcinit/fusermount3`，`/lzcinit` 自动加入 `PATH` |
 | **动态启动器图标** | **v1.6.2** | `/lzcapp/run/launcher-icon/`；按用户覆盖、重启重新生成 |
+| **`X-HC-User-Groups` 请求头** | **v1.6.3** | 用户组 JSON 数组（组 UUID + Base64 组名），组级权限判断 ⭐ |
 | **物理显示器 VT** | **v1.6.1** | `vt.display` + `application.vt: true`，不支持 `sysbox-runc` |
 | **文件选择器拦截** | **v1.5.0+** | **应用商店强制：有上传/下载必须接入** ⭐ |
 
@@ -102,6 +103,7 @@ LPK v2（tar 格式，包含 `package.yml`）是 lzcos v1.5.0+ 才支持的特�
 | 使用 **`fuse.mount` 权限** | **1.6.1** |
 | 使用 **物理显示器 VT** | **1.6.1** |
 | 使用 **动态启动器图标** | **1.6.2** |
+| 读取 **`X-HC-User-Groups`（组级权限）** | **1.6.3** ⭐ |
 | **文件选择器拦截（应用商店强制）** | **1.5.0** ⭐ |
 
 详见 [references/version-features.md](references/version-features.md) 和 [references/strict-constraints.md](references/strict-constraints.md)
@@ -357,21 +359,23 @@ lzc-cli lpk info app.lpk
 
 #### Step 3.2: 发布目标决策（发布前必做）
 
-**规则：非激励应用默认发布到私有/社区商店（喵喵商店），不上传官方应用商店；提交官方商店必须先获得用户明确确认。**
+**规则：发布目标由用户确认，默认推荐官方商店；提交官方商店必须先获得用户明确确认，未经确认不提交审核。**
 
-1. 按 [store-rule.md](references/store-rule.md)「不发放激励的应用类型」清单判断应用类型：图床、导航、在线看视频、MyTube、博客、RSS、AI 写小说、书签、笔记、清单、理财记账、求职简历 AI、VPN、短链、阅后即焚、数据库、API 聚合/中转、Web to API、接口逆向、Cron、Agent 角色对话、VNC 等。**类型模糊或不在清单时，按非激励默认处理**（发布到社区商店），并说明判断依据。
-2. **非激励应用** → 默认发布到私有/社区商店（喵喵商店）：
+1. 说明当前激励政策（[store-rule.md](references/store-rule.md)）：**2026-10 改版后激励不再按应用类型区分**——所有上架应用累计下载 100 次即获 100 元 + 用户打赏通道；旧版"不激励类型清单"已取消。因此**不存在"非激励应用"这一判断维度**，发布目标纯由用户意图决定。
+2. **官方商店**（默认推荐，享受下载量激励 + 打赏 + 更大曝光）：
+   - 使用 `lzc-cli appstore publish` 或 [ca-x/lazycat-github-action](https://github.com/ca-x/lazycat-github-action) 的 `stores.official`（要求 LazyCat 交付模式）。
+   - 提交前向用户说明审核预期（1-3 个工作日）；强制要求：免密登录（[passwordless-login.md](references/passwordless-login.md)）、上传/下载必须接入文件选择器拦截（[file-picker-intercept.md](references/file-picker-intercept.md)）。
+3. **私有/社区商店（喵喵商店）**（自用 / 不想走官方审核时）：
    - 默认发布到 [github.com/lazycat-contrib](https://github.com/lazycat-contrib) 组织；用户可自建服务端。
-   - 使用 [ca-x/lazycat-github-action](https://github.com/ca-x/lazycat-github-action)（`stores.private`），**社区发布默认推荐镜像模式**；交付模式、Secrets 等配置细节查单独安装的 lazycat-github-action skill。
+   - 使用 ca-x/lazycat-github-action 的 `stores.private`，**社区发布默认推荐镜像模式**；交付模式、Secrets 等配置细节查单独安装的 lazycat-github-action skill。
    - **不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
-   - 🔴 **CHECKPOINT：** 向用户确认发布目标。只有用户明确要求上传官方商店时才执行官方发布；确认前不得提交官方商店审核。
-   - **边界情况：**
-     - 用户坚持官方商店（非激励类）→ 说明"不参与激励不代表不能上架"，经用户确认后走官方流程。
-     - 社区商店凭据缺失（`APPSTORE_URL`/`APPSTORE_TOKEN` 不可用）→ 停止并列缺失项，**不要回退到官方商店**。
-3. **激励类应用**（不在排除清单）→ 默认走官方商店流程（`lzc-cli appstore publish` 或 `stores.official`），提交前向用户说明审核预期（1-3 个工作日）。官方商店另有强制要求：免密登录（[passwordless-login.md](references/passwordless-login.md)）、上传/下载必须接入文件选择器拦截（[file-picker-intercept.md](references/file-picker-intercept.md)）。
+4. 🔴 **CHECKPOINT：** 向用户确认发布目标。用户未明确表态时不擅自提交官方商店审核；选择社区商店时不执行任何官方发布动作。
+5. **边界情况：**
+   - 社区商店凭据缺失（`APPSTORE_URL`/`APPSTORE_TOKEN` 不可用）→ 停止并列缺失项，**不要静默回退到官方商店**。
+   - 应用触及禁止上架类型（黄赌毒、破解、违法）→ 官方商店一律不可提交，说明原因。
 
 ```bash
-# 官方商店发布（仅激励类应用，或用户明确确认后）
+# 官方商店发布（用户确认后）
 lzc-cli appstore publish app.lpk
 ```
 
@@ -991,7 +995,7 @@ locales:
 | 对 `image: .*` 做全局 `sed` 替换 | 多镜像项目会更新错服务 | 用 `scripts/lzc-release-update.sh --service <name>` |
 | 多镜像 manifest 未确认 service 就复制/发布 | 用户无法判断到底更新了哪个容器 | 先列出 `services.*.image`，要求显式选择或读取 `.lazycat-release.env` 并打印 |
 | 构建后默认发布 | 未审核的 LPK 进入应用商店流程 | 只有用户要求或传 `--publish` 时调用 `lzc-publish` |
-| 非激励应用直接 `lzc-cli appstore publish` 提交官方商店 | 未获用户确认即进入官方审核流程 | 默认发布到私有/社区商店（喵喵商店，`stores.private`）；提交官方商店前必须用户确认（见 Step 3.2） |
+| 跳过用户确认直接提交官方商店审核 | 未获用户确认即进入官方审核流程 | 发布目标向用户确认后才执行；选择社区商店时不执行任何官方发布动作（见 Step 3.2） |
 | 应用名称杂糅翻译或用途描述（如 `FlyCMS 飞翔内容管理系统`、`HealthTrack 家庭健康管家`） | 名称越权承担了 description 的职责；名称只回答"软件叫什么"，商店列表观感劣质 | 名称只留软件名（`FlyCMS`）；中文名放 `locales.zh.name`（有正式译名才写）；用途/类别放 `description`（见 LPK v2 示例的命名规范） |
 | `copy-image` 解析不到 registry 地址仍继续 | manifest 指向不存在或旧镜像 | 立即停止，保留文件，提示用户贴出完整输出 |
 | 只改 manifest 不改 `package.yml` 版本 | 构建产物版本混乱，更新审核失败 | 同步更新 `package.yml` 顶层 `version` |
@@ -1409,25 +1413,36 @@ services:
 - `<a download>` 下载链接
 - 文件导入/导出功能
 
-**🔴 CHECKPOINT**: 检测到文件操作时，**必须配置文件选择器拦截**：
+**🔴 CHECKPOINT**: 检测到文件操作时，**必须配置两段式拦截**（browser inject + request inject；只配 browser 时他人共享目录无法按 owner 切换文件根目录）：
 
 ```yaml
 # lzc-manifest.yml
 application:
   injects:
+    # ① browser inject：接管页面文件入口
     - id: open-save-chooser
       on: browser
       when:
         - /*
       do:
         - src: file:///lzcapp/pkg/content/lazycat-injects/lzc-file-chooser-inject.js
+          params:
+            fileBridgeRoot: /__lazycat_file_bridge
+    # ② request inject：同源文件桥接（共享目录 owner 转发）
+    - id: lazycat-file-bridge
+      on: request
+      when:
+        - /__lazycat_file_bridge/*
+      do:
+        - src: |   # 完整源码见 references/file-picker-intercept.md 或官方文档
 ```
 
 同时需要将 `lzc-file-chooser-inject.js` 放入包的 content 目录。
 
 | 失败后果 | 恢复路径 |
 |---------|---------|
-| 应用商店审核拒绝 → 无法上架 | 下载 `lzc-file-chooser-inject.js` 放入 `content/lazycat-injects/`，在 manifest 添加 inject 声明 |
+| 应用商店审核拒绝 → 无法上架 | 下载 `lzc-file-chooser-inject.js` 放入 `content/lazycat-injects/`，在 manifest 添加两段 inject 声明 |
+| 保存到他人共享目录 `409 Conflict` | 请求发往 `/_lzc/files/home/` 说明缺 request inject；补齐 `lazycat-file-bridge` 并确认 `fileBridgeRoot` 与 `bridgePrefix` 一致 |
 
 详见 [references/file-picker-intercept.md](references/file-picker-intercept.md)
 

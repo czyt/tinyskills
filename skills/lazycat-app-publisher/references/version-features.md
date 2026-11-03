@@ -317,6 +317,14 @@ For applications accessing user documents:
 # ext_config.enable_document_access: true
 ```
 
+## v1.6.3 用户组请求头
+
+- 新增 `X-HC-User-Groups` 请求头（lzcos v1.6.3+）：JSON 数组，每个元素 `{id, name}`——`id` 是稳定组 UUID（明文），`name` 是 UTF-8 组名的标准 Base64 编码（保留 `=` 填充）。应用先 JSON 解析再对各 `name` 做 Base64 解码。
+- 未加入任何组的用户不发送该头；`lzc-ingress` 会清除调用方传入的同名头再按已认证用户设置。
+- 管理员变更成员/组名后，每次新请求即时反映，无需用户重新登录。
+- 用户组目前无正式管理页面；测试期管理员手动进系统设置站点 `/sys/debug/` → `user-groups` 创建组并维护成员。
+- 应用用 `id` 绑定权限规则（重命名组不改 `id`），`name` 仅用于展示。
+
 ## v1.6.2 兼容性与动态图标
 
 - 动态启动器图标要求 `min_os_version: 1.6.2`，详见 [dynamic-icon.md](dynamic-icon.md)。

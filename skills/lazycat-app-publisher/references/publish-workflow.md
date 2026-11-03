@@ -315,23 +315,22 @@ locales:
 
 ## 🎯 发布目标决策（发布前必做）
 
-**规则：非激励应用默认发布到用户的私有/社区商店（喵喵商店），不上传官方应用商店；提交官方商店必须先获得用户明确确认。**
+**规则：发布目标由用户确认，默认推荐官方商店；提交官方商店必须先获得用户明确确认，未经确认不提交审核。**
 
 | 目标 | 渠道 | 机制 | 审核 |
 |------|------|------|------|
+| **官方应用商店**（默认推荐） | appstore.lazycat.cloud | `lzc-cli appstore publish` 或 ca-x/lazycat-github-action `stores.official`（LazyCat 交付模式） | 1-3 个工作日 |
 | **私有/社区商店（喵喵商店）** | 默认 [github.com/lazycat-contrib](https://github.com/lazycat-contrib) 组织；用户可自建服务端 | ca-x/lazycat-github-action `stores.private`，**默认推荐镜像模式** | 无官方审核 |
-| **官方应用商店** | appstore.lazycat.cloud | `lzc-cli appstore publish` 或 `stores.official`（LazyCat 交付模式） | 1-3 个工作日 |
 
 决策流程：
 
-1. 按 [store-rule.md](store-rule.md)「不发放激励的应用类型」清单判断应用类型。
-2. **非激励应用** → 默认发布到私有/社区商店（喵喵商店）：默认发布到 `lazycat-contrib` 组织（用户可自建服务端）；用 ca-x/lazycat-github-action 的 `stores.private`，**默认推荐镜像模式**；**不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
-3. 🔴 **CHECKPOINT：** 向用户确认发布目标。只有用户明确要求上传官方商店时才执行官方发布；确认前不得提交官方商店审核。
-4. **激励类应用** → 默认走官方商店流程（`lzc-cli appstore publish` 或 `stores.official`），提交前向用户说明审核预期（1-3 个工作日）。
+1. 说明激励政策（[store-rule.md](store-rule.md)）：**2026-10 改版后激励不分应用类型**——所有上架应用下载破 100 即 100 元 + 用户打赏通道；旧版"不激励类型清单"已取消，**不存在按类型判断发布目标这回事**。
+2. **官方商店**（默认推荐）：`lzc-cli appstore publish` 或 `stores.official`；提交前向用户说明审核预期（1-3 个工作日）。
+3. **私有/社区商店**（自用 / 不想走官方审核）：默认发布到 `lazycat-contrib` 组织（用户可自建服务端）；用 ca-x/lazycat-github-action 的 `stores.private`，**默认推荐镜像模式**；**不执行** `lzc-cli appstore publish`，不启用 `stores.official`。
+4. 🔴 **CHECKPOINT：** 向用户确认发布目标。用户未明确表态时不擅自提交官方商店审核；用户选社区商店时不做任何官方发布动作。
 5. 边界情况：
-   - 类型模糊或不在清单 → 按非激励默认处理并说明依据；
-   - 用户坚持官方商店（非激励类）→ 说明"不参与激励不代表不能上架"，经确认后走官方；
-   - 社区商店凭据缺失（`APPSTORE_URL`/`APPSTORE_TOKEN` 不可用）→ 停止并列缺失项，**不要回退到官方商店**。
+   - 社区商店凭据缺失（`APPSTORE_URL`/`APPSTORE_TOKEN` 不可用）→ 停止并列缺失项，**不要静默回退到官方商店**；
+   - 应用触及禁止上架类型（黄赌毒、破解、违法）→ 官方商店一律不可提交，说明原因。
 
 **两种发布都使用 [ca-x/lazycat-github-action](https://github.com/ca-x/lazycat-github-action) 配合 lazycat-github-action skill。交付模式、Secrets、workflow 配置细节以单独安装的 lazycat-github-action skill 为准，本 skill 不重复。**
 
