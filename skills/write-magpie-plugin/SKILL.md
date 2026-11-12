@@ -1,19 +1,34 @@
 ---
 name: write-magpie-plugin
-description: Use when 为 magpie（usemagpie.ai）编写供应商插件、把某个 AI 套餐/订阅接入 magpie、写 OpenCode provider plugin、排查插件加载失败或登录不工作、实现 auth/usage/refresh/checkin 钩子、token 过期续期、多账号管理、发布插件到 npm 或 magpie-community、写网关中间件（middleware/strategies/onProvider）、异步网关请求钩子（hooks/onRequest/onResponse）、工具插件、Agent 插件、窗口页面与面板（page/panels/actions）、每日签到 checkin、额度 quota 显示、serviceTiers、maxConcurrency、插件更新与同 id 冲突。English: write a provider plugin for usemagpie, gateway middleware, magpie plugin not loading.
+description: "Use when 为 magpie（usemagpie.ai）编写或排查供应商、网关中间件、异步请求钩子、工具、Agent、页面和面板插件，接入登录、额度、签到或模型负载，或发布到 npm 或 magpie-community。English: usemagpie plugin development, provider auth, gateway hooks, tools, agents and pages."
 ---
 
 # Magpie 插件开发
 
-为 magpie（usemagpie.ai）编写供应商插件：登录某个 AI 服务、替它发请求，使它成为 magpie 的供应商。magpie 运行 OpenCode v1 供应商插件，为 OpenCode 写的插件不用改就能用；magpie 专属钩子（`auth.usage`、`auth.refresh`、`auth.checkin`、`magpie.*` 字段）OpenCode 会忽略，一个包可以同时服务两边。除供应商插件外还有异步网关请求钩子、中间件、工具、Agent、页面/面板等形态（见「其他插件形态」）。
+为 magpie（usemagpie.ai）开发插件，先选扩展点，不要把所有功能都建模成供应商。供应商插件负责登录某个 AI 服务、替它发请求。magpie 运行 OpenCode v1 供应商插件，为 OpenCode 写的插件可复用其供应商能力；magpie 专属钩子（`auth.usage`、`auth.refresh`、`auth.checkin`、`magpie.*` 字段）OpenCode 会忽略。其他形态包括异步网关请求钩子、中间件、工具、Agent、页面和面板。
 
 **核心原则：插件 = 一个 async 函数返回一组钩子；先分清"OpenCode 标准"与"magpie 专属"，再动手。**
 
-完整 API 细节查 [references/plugin-doc-full.md](references/plugin-doc-full.md)（官方文档全文）；现成参考实现见 [magpie-community/plugins](https://github.com/magpie-community/plugins)（cline、cursor、zed、grok、zcode 等 20+ 个，含审核标准）。
+完整 API 细节查 [references/plugin-doc-full.md](references/plugin-doc-full.md)（2026-11-12 官方文档正文快照）；现成参考实现见 [magpie-community/plugins](https://github.com/magpie-community/plugins)。社区实现与源码观察要单独标明，不能当成公开 API。实现前按目标版本复核官方文档；快照日期不是最低支持版本。
+
+## 先选扩展点与能力边界
+
+| 用户目标 | 路径 | 不能混淆的边界 |
+|---|---|---|
+| 登录、模型、额度、签到 | Bun 供应商插件 | 只有这类任务才需要下方供应商三问和 provider test |
+| 联网增强 Agent 请求 | Bun 异步请求钩子 | 不是 moejs 中间件；不可改模型、stream 或工具选择 |
+| 同步改写、路由策略、用量观察 | moejs 中间件 / gateway | 无 Node API、网络或定时器 |
+| 给 Agent 新工具 | OpenCode `tool` 钩子 | 自动进入插件 MCP 服务，遵守工具参数校验与超时 |
+| 接入另一种 Agent | `magpie.agent` | `library.skills` 是该 Agent 的技能安装目录 |
+| 独立页面或嵌入面板 | `magpie.page` / `panels` | iframe 没有 fetch；不能调用任意宿主 API |
+
+- `page.replaces` 替代整个内置页面；`panels` 的 slot 只有 `agents/usage/settings/provider`。
+- 页面 bridge 公开的业务读取只有 `usage:summary` 和 `providers:list`；`options.get/set` 是普通选项存储，不是通用 RPC 或安全凭据库。
+- 遇到文档未覆盖的扩展要求，先核对目标版本源码或现成插件，不要编造钩子或 manifest 字段。
 
 ## 开发工作流
 
-1. **确认接入形态**（三问，答完与用户确认再动手）：
+1. **确认接入形态**：先按上表选路径；只有供应商插件才确认下面三项，能从现有上下文确定的不要重复问：
    - 登录方式？API key（`type: "api"`）/ 浏览器或设备码（`type: "oauth"` + `authorize` 返回 url+callback）。
    - 模型走什么 API？见下方「API 对照表」，决定 `npm` 字段。
    - 模型列表是静态还是账号相关？静态写 `config` 钩子；账号相关加 `provider.models` 钩子。
@@ -33,7 +48,7 @@ description: Use when 为 magpie（usemagpie.ai）编写供应商插件、把某
    m plugin logout <id>        # 登出后重测登录流程
    ```
 
-   🔴 **CHECKPOINT（测试通过标准）：** `m plugin --json` 无加载错误、`m provider test` 各模型全过、`m quota`（若实现了 usage）显示正确——全部通过才进入发布。测试失败先查「失败模式速查」，修复后重测；不得跳过测试直接发布。
+   🔴 **CHECKPOINT（测试通过标准）：** `m plugin --json` 无加载错误；供应商插件运行 `m provider test`，实现 usage 时验证 `m quota`。其他形态验证自己的能力：工具用真实 MCP 调用，页面验证 bridge/权限/CSP/主题，Agent 验证接入与恢复，中间件验证失败降级。不要为纯页面或工具伪造供应商来满足测试。未装 magpie 时只报告完成了离线验证，不声称宿主集成通过。测试失败先查「失败模式速查」，不得跳过验证直接发布。
 5. **发布**：npm 照常发布（搜索靠 keywords：`opencode` + `auth`/`plugin`/`provider` 之一）；想进推荐列表给 [magpie-community/plugins](https://github.com/magpie-community/plugins) 的 `registry.json` 提 PR（需 `name`、`providers`、`icon`、双语 `summary`；中间件/工具/页面/Agent 条目写 `kind` 且不写 providers；`MAGPIE_PLUGIN_MARKET=<url>` 可先测自己的条目，`off` 只用内置副本）；贡献进社区仓库放 `packages/<name>`，包名 `@magpie-community/opencode-<name>-auth`，版本号推到 `main` 自动发布。GitHub 打 `magpie-plugin` topic 可进"非官方插件"列表（`package.json` 必须在仓库根目录，加载文件必须已提交——dist 只在发布时构建的仓库不显示）。
 
 ## 最小可用模板（API key + OpenAI 兼容）
@@ -102,7 +117,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | `auth.loader(getAuth)` | OpenCode | 每账号一次，返回 `baseURL`/`apiKey`/`headers`/`fetch` | 登录信息变化后重新运行；每账号作用域，状态按 auth 存，不放供应商级模块变量 |
 | `provider.models(provider, {auth})` | OpenCode | 账号相关的模型列表 | 失败时返回 `provider.models` 或抛异常，magpie 保留原列表；登录失效抛 `{signIn: "expired"}` |
 | `auth.usage(getAuth)` | **magpie** | 额度用量，显示在 `magpie quota` 与 `GET /v1/magpie/quotas` | 返回 `{plan, user, until, renew, balance, resets, windows:[{name, used, resetsAt 或 resetSecs, span, display, amount/limit/unit, model(s)/notModels, aside, runsOut*}], …}`，字段全可选；拉取失败返回 `{error, signIn: "kept"}` 降级，别抛异常把账号标成失效 |
-| `auth.options` | **magpie** | 供应商编辑器里的开关卡片 | `[{key, label, description, default, confirm}]`，confirm 说明将发生的写操作（如"会创建令牌"）；截至 2026-10 官方文档仍未收录，以社区仓库为准 |
+| `auth.options` | **magpie / 社区实现参考** | 供应商编辑器里的开关卡片 | `[{key, label, description, default, confirm}]`，confirm 说明将发生的写操作（如"会创建令牌"）；本次官方文档快照未收录，沿用社区参考，需对目标版本核实 |
 | `auth.refresh(auth)` | **magpie** | token 续期，magpie 统一调度 | 同一时间只续一次（refresh token 一次性也安全）；失败带 `signIn: "expired"`；OpenCode 忽略此钩子，fetch 里保留续期检查保兼容 |
 | `auth.checkin(getAuth)` | **magpie** | 每日签到 | 返回 `{outcome: "claimed"/"done"/"ineligible"/…}`；**绝不自动解验证码**，返回 `captcha`。正式文档「签到」章节，需 v0.1.1083+；outcome 全集 claimed/done/ineligible/inactive/captcha/failed，可另带 credit/streak/message；2xx 但无可领是 done 不是 failed；返回表外值=failed，magpie 当天稍后再试 |
 | `"chat.headers"(input, output)` | OpenCode | 每请求加头（会话/缓存头） | `input.sessionID` 同对话不变 |
@@ -119,6 +134,8 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 - **服务档位**：models 钩子返回的模型可写 `serviceTiers`（如 ["priority","ultrafast"]）——写进 Codex 模型列表（priority 显示为 Fast）；Chat/Responses 请求选档时以 `service_tier` 到达 fetch；magpie 转协议的请求不会发出模型没列的档位。
 - **并发上限**：`magpie.maxConcurrency`（package.json）或 `auth.maxConcurrency`（优先），1–1000，每账号同时请求数；用户在供应商上的设置优先。
 - **插件更新**：@magpie-community/* 启动后与每小时自动更新；其他 npm 包出小圆点待用户确认（`magpie plugin update`）；`name@1.2.3` 固定版本不自动升；git 仓库按分支/标签指向的提交比对，固定到提交无更新。
+- **取消固定版本**：固定 npm 版本仅阻止自动升级；用户主动点更新或运行 `magpie plugin update` 会装最新版并取消固定。npm 源优先读取现有 `.npmrc` / `.bunfig.toml` / 环境变量；`magpie plugin registry <url>` 修改，`default` 恢复；不要自行改用户全局 npm 设置。
+- **模型负载**：`input.magpie?.load?.(provider, {model: percentOrNull})`，Bun 插件自行上报；每模型五分钟有效，未知不等于 0；0–10000，超界截断，非数字丢弃，每次最多 1000 模型。启用「繁忙的模型靠后」才影响路由，旧宿主必须做能力检测。
 - **同 id 双插件**：两个插件登录同一供应商 id 时只由一个提供（选定优先，否则后添加的优先）；`magpie plugin use <名字> <id>` 或在插件列表改选。
 - **联网搜索透传**：转发 Anthropic/OpenAI 官方 API 时设 `searches: true`，客户端搜索请求原样到达你的 fetch。
 - **决策 API**：给提供商设 `decide: true` + 模型 `decides: true`（config 或 models 钩子里写都行），模型可作为路由分类器（`POST {baseURL}/systemone`，请求体 {model, questions, state}）；标了 `decides` 的模型和名为 jev-* 的模型对智能体隐藏。
@@ -134,7 +151,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | 网关中间件 | `"magpie": {"middleware": "./mw.js"}` 或 `*.middleware.js` 单文件 | **moejs 引擎运行（非 Bun）**：无 Node API/fetch/timer，只能相对导入、依赖打进文件；钩子 `onRequest`/`onProvider`/`onEvent`/`onResponse`（onProvider 按供应商尝试再调用，不能再拒/改路由）；选项 `ctx.options` 用 `magpie plugin options` 设；出错/超时按不存在处理；请求 250ms/事件 50ms/加载 1s；每秒热重载 |
 | 路由策略/用量 | `*.gateway.js` 或 `"magpie": {"gateway": …}` | `strategies[name]` 返回座位顺序（20ms）；`onUsage` 收用量记录（250ms，异步不阻塞） |
 | 异步网关请求钩子 | `"magpie": {"hooks": "./hooks.js"}` 或 `*.hooks.js` 单文件 | **Bun 运行**（非 moejs）：具名 async `onRequest(body, ctx)` 在路由前改 Agent 请求体（如注入召回上下文），可选 `onResponse` 尽力通知；改 model/stream/工具会被回滚算失败；默认 1s（`gatewayTimeoutMs` 100–10000），整链 2–10s；对所有供应商生效；纯网关插件不需要 main/exports |
-| 工具插件 | OpenCode `tool` 钩子 + `@opencode-ai/plugin` | 组成 magpie 的 MCP 服务器 `/mcp/magpie/tools`；工具名 `<插件>_<工具>`；单工具 55s 超时 |
+| 工具插件 | OpenCode `tool` 钩子 + `@opencode-ai/plugin` | 聚合 MCP `/mcp/magpie/tools` 工具名 `<插件>_<工具>`；同时自动成为资源库 MCP 页的独立服务器，MCP 路由名 `<插件>__<工具>`；单工具 55s，传递 `ctx.abort`；可在插件页「对智能体隐藏」且重启/更新保持 |
 | Agent 插件 | `"magpie": {"agent": "./agent.js"}` 或 `*.agent.js` | 声明 Agent 配置文件位置与模型键，`connect({gateway, model, models, agent})` 返回要写入的键（gateway 有 url/v1/key，model 含 native_endpoints 与 pricing）；moejs 运行；与内置 Agent 同 id 会被拒；资源库 `library: {instructions, mcp, mcpFormat, skills}`——写 mcp 必须写 mcpFormat，否则拒绝加载 |
 | 窗口页面 | `"magpie": {"page": {"title", "file", "icon"}}` | 纯 HTML/CSS/JS 沙盒 iframe：无 fetch/内联脚本，`magpie.read()` 只能读 `permissions` 声明的（`usage:summary`、`providers:list`）；可 `replaces` 内置页面（sessions/library/routing/usage）、往自带页面加 `panels`（slot: agents/usage/settings/provider，最多 8 个）、加 `actions` 右键菜单项（最多 8 个）；`page.titles` 多语言 |
 | pi 扩展包 | `pi.registerProvider` 注册供应商 | 不用改直接用；登录走 pi 的 onPrompt/onAuth |
@@ -166,6 +183,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | `magpie plugin use` 提示找不到插件 | 同 id 双插件按名字/spec/短名定位；先 `m plugin --json` 看两个包各自由谁提供；仍不行卸载多余的那个 |
 | 签到 outcome 总是 failed | 返回了表外 outcome 或抛异常；2xx 但无可领要回 `done` 不是 failed；验证码回 `captcha` 绝不自动解；仍失败查账号作用域（getAuth 拿的是本账号）|
 | 面板/页面空白或显示已停止工作 | panels slot 只能 agents/usage/settings/provider；高度跟随 <html>（最高 2400px），别给 html/body 固定高度；10 秒内无应答判停 |
+| 静态页面 fetch 失败 | 页面 CSP 为 `connect-src 'none'`，bridge 仅支持公开的调用；不要假设静态页面具备任意联网或宿主操作权限 |
 
 以上之外，实现纪律类红线见「反例黑名单」。
 
@@ -192,6 +210,7 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 | 15 | 异步 hooks 里改 model/stream/工具选择 | 回滚算失败，该请求不再调 onResponse；onRequest 只做增强 |
 | 16 | Agent 插件 id 用内置 Agent 名（codex/claude…） | 已在黑名单 #7；library.mcp 不配 mcpFormat 同样拒绝加载 |
 | 17 | 给页面/面板的 html 或 body 设固定高度 | 面板高度跟随 <html>（≤2400px），固定高度显示截断 |
+| 18 | 把密钥存进页面 options、URL 或浏览器日志 | options 是普通配置且页面可读取；凭据留在后端，按已验证的认证接口或系统凭据机制管理 |
 
 ## 使用说明
 
@@ -200,4 +219,4 @@ export const AcmeAuthPlugin = async ({ client }) => ({
 - **单文件全功能范例**：[egenchen/magpie-packycode](https://github.com/egenchen/magpie-packycode)——key 占位符、fetch 域名防护、config 合并、动态模型、usage 卡片（失败降级 `signIn: "kept"`）、`auth.options` 开关卡片（含 confirm）、多 key 故障转移、node --test + CI，UI/交互写法看它一个文件够了。
 - **登录状态/多账号/多协议分流范例**：社区仓库 packages/zed（`api: {id, url, npm}`）、packages/zcode（`X-Magpie-Sign-In: kept` 包装、usage 窗口换算）、packages/packycode 同仓库路径（多 key 故障转移）；API key 多账号备注名同见 zcode/packycode。
 - **Agent skill 形态的范例**：[magpie-quota](references/example-magpie-quota-skill.md) 是社区官方 skill（让 agent 查额度/等待恢复），展示了好的 skill 写法——frontmatter description 只写触发条件、命令+JSON 结构速查、"Don't" 黑名单收尾、明确 exit codes。给 magpie 生态写 skill（社区仓库 `skills/<name>/SKILL.md`）或写插件时可参照它的结构与克制。
-- references/plugin-doc-full.md 已更新为 2026-10-26 抓取的最新官方文档（含签到、异步网关请求钩子、onProvider、panels、serviceTiers、actions/replaces、更新机制）；`auth.refresh` 需 v0.1.684+，`auth.checkin` 需 v0.1.1083+（文档示例标注 v0.1.676）。
+- references/plugin-doc-full.md 是 2026-11-12 抓取的官方文档正文，含模型负载、npm 源、工具 MCP 路由和持久隐藏、Agent 混合 Bun 入口、页面 WebKit CSP 注意事项。文档示例验证版本 v0.1.676 不代表所有新能力都支持该版本；`auth.refresh` 的 v0.1.684+、`auth.checkin` 的 v0.1.1083+ 是原有兼容性记录，发布前对目标版本复测。
